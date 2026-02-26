@@ -9,11 +9,12 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 
-type TabType = 'all' | 'international' | 'domestic' | 'leagues';
+type TabType = 'all' | 'active' | 'international' | 'domestic' | 'leagues';
 
 // Define the param list for the Top Tabs
 type TopTabParamList = {
   All: { type: 'all' };
+  Active: { type: 'active' };
   International: { type: 'international' };
   Domestic: { type: 'domestic' };
   Leagues: { type: 'leagues' };
@@ -27,15 +28,16 @@ interface Series {
   image: string;
   month: string;
   type: 'international' | 'domestic' | 'leagues';
+  isActive?: boolean;
 }
 
 const MOCK_SERIES: Series[] = [
-  { id: '1', name: 'ICC World Cup 2024', date: 'Oct 5 - Nov 19', matches: 48, image: '🏆', month: 'October 2024', type: 'international' },
-  { id: '2', name: 'Big Bash League', date: 'Oct 15 - Jan 24', matches: 61, image: '⚡', month: 'October 2024', type: 'leagues' },
-  { id: '3', name: 'India vs Australia', date: 'Nov 22 - Jan 7', matches: 5, image: '🏏', month: 'November 2024', type: 'international' },
-  { id: '4', name: 'Indian Premier League', date: 'Nov 25 - Dec 20', matches: 74, image: '🎯', month: 'November 2024', type: 'domestic' },
-  { id: '5', name: 'Pakistan Super League', date: 'Dec 17 - Jan 18', matches: 34, image: '🌟', month: 'December 2024', type: 'leagues' },
-  { id: '6', name: 'England vs New Zealand', date: 'Dec 5 - Dec 15', matches: 3, image: '🏴', month: 'December 2024', type: 'international' },
+  { id: '1', name: 'ICC World Cup 2024', date: 'Oct 5 - Nov 19', matches: 48, image: '🏆', month: 'October 2024', type: 'international', isActive: true },
+  { id: '2', name: 'Big Bash League', date: 'Oct 15 - Jan 24', matches: 61, image: '⚡', month: 'October 2024', type: 'leagues', isActive: false },
+  { id: '3', name: 'India vs Australia', date: 'Nov 22 - Jan 7', matches: 5, image: '🏏', month: 'November 2024', type: 'international', isActive: true },
+  { id: '4', name: 'Indian Premier League', date: 'Nov 25 - Dec 20', matches: 74, image: '🎯', month: 'November 2024', type: 'domestic', isActive: false },
+  { id: '5', name: 'Pakistan Super League', date: 'Dec 17 - Jan 18', matches: 34, image: '🌟', month: 'December 2024', type: 'leagues', isActive: true },
+  { id: '6', name: 'England vs New Zealand', date: 'Dec 5 - Dec 15', matches: 3, image: '🏴', month: 'December 2024', type: 'international', isActive: false },
 ];
 
 const TopTab = createMaterialTopTabNavigator<TopTabParamList>();
@@ -50,7 +52,7 @@ const SeriesList = () => {
   // Memoize filtering to prevent heavy calculation on every render
   const groupedSeries = useMemo(() => {
     const filtered = MOCK_SERIES.filter(s =>
-      (type === 'all' || s.type === type) &&
+      (type === 'all' || (type === 'active' ? s.isActive : s.type === type)) &&
       s.name.toLowerCase().includes(search.toLowerCase())
     );
 
@@ -118,16 +120,19 @@ export const SeriesScreen: React.FC = () => {
       </LinearGradient>
 
       <TopTab.Navigator
+        initialRouteName="Active"
         screenOptions={{
           tabBarActiveTintColor: theme.primary,
           tabBarInactiveTintColor: theme.textSecondary,
           tabBarIndicatorStyle: { backgroundColor: theme.primary },
           tabBarStyle: { backgroundColor: theme.surface },
-          tabBarLabelStyle: { fontWeight: 'bold', textTransform: 'capitalize', minWidth: 100, flex: 1 },
+          tabBarLabelStyle: { fontWeight: 'bold', textTransform: 'capitalize', },
+          tabBarScrollEnabled: true,
           lazy: true,
         }}
       >
         <TopTab.Screen name="All" component={SeriesList} initialParams={{ type: 'all' }} />
+        <TopTab.Screen name="Active" component={SeriesList} initialParams={{ type: 'active' }} />
         <TopTab.Screen name="International" component={SeriesList} initialParams={{ type: 'international' }} />
         <TopTab.Screen name="Domestic" component={SeriesList} initialParams={{ type: 'domestic' }} />
         <TopTab.Screen name="Leagues" component={SeriesList} initialParams={{ type: 'leagues' }} />

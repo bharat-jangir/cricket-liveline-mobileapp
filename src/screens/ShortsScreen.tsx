@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useTheme } from '../theme/ThemeContext';
 import { Text as ThemedText } from '../components/ui/Text';
 import { spacing } from '../theme';
@@ -72,6 +73,9 @@ const MOCK_SHORTS: Short[] = [
 
 export const ShortsScreen: React.FC = () => {
   const { theme } = useTheme();
+  const tabBarHeight = useBottomTabBarHeight();
+  const shortHeight = SCREEN_HEIGHT - tabBarHeight;
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [likedShorts, setLikedShorts] = useState<Set<string>>(new Set());
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>(
@@ -101,7 +105,7 @@ export const ShortsScreen: React.FC = () => {
   const handleLike = (shortId: string) => {
     const isLiked = likedShorts.has(shortId);
     const newLikedShorts = new Set(likedShorts);
-    
+
     if (isLiked) {
       newLikedShorts.delete(shortId);
       setLikeCounts(prev => ({ ...prev, [shortId]: prev[shortId] - 1 }));
@@ -119,7 +123,7 @@ export const ShortsScreen: React.FC = () => {
       <TouchableOpacity
         activeOpacity={1}
         onPress={() => handleDoubleTap(item.id)}
-        style={styles.shortContainer}
+        style={[styles.shortContainer, { height: shortHeight }]}
       >
         <View style={styles.videoPlaceholder}>
           <ThemedText variant="title" color="white" weight="bold">
@@ -194,11 +198,11 @@ export const ShortsScreen: React.FC = () => {
         keyExtractor={(item) => item.id}
         pagingEnabled
         showsVerticalScrollIndicator={false}
-        snapToInterval={SCREEN_HEIGHT}
+        snapToInterval={shortHeight}
         snapToAlignment="start"
         decelerationRate="fast"
         onMomentumScrollEnd={(event) => {
-          const index = Math.round(event.nativeEvent.contentOffset.y / SCREEN_HEIGHT);
+          const index = Math.round(event.nativeEvent.contentOffset.y / shortHeight);
           setCurrentIndex(index);
         }}
       />
@@ -212,7 +216,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
   },
   shortContainer: {
-    height: SCREEN_HEIGHT,
     width: SCREEN_WIDTH,
     backgroundColor: '#000',
   },
