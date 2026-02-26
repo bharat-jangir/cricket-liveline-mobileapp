@@ -1,0 +1,93 @@
+import React from 'react';
+import { Text as RNText, TextStyle } from 'react-native';
+import { useTheme } from '@/theme/ThemeContext';
+import { fontSize } from '@/theme';
+
+interface TextProps {
+  children: React.ReactNode;
+  variant?: 'heading' | 'title' | 'subtitle' | 'body' | 'caption' | 'small';
+  color?: 'primary' | 'secondary' | 'text' | 'textSecondary' | 'textLight' | 'white';
+  weight?: 'normal' | 'medium' | 'semibold' | 'bold';
+  align?: 'left' | 'center' | 'right';
+  numberOfLines?: number;
+  style?: TextStyle | TextStyle[] | any;
+}
+
+export const Text: React.FC<TextProps> = ({
+  children,
+  variant = 'body',
+  color = 'text',
+  weight = 'normal',
+  align = 'left',
+  numberOfLines,
+  style,
+}) => {
+  const { theme } = useTheme();
+
+  const getTextStyle = (): TextStyle => {
+    const baseStyle: TextStyle = {
+      textAlign: align,
+    };
+
+    // Font size based on variant
+    switch (variant) {
+      case 'heading':
+        baseStyle.fontSize = fontSize.heading;
+        break;
+      case 'title':
+        baseStyle.fontSize = fontSize.title;
+        break;
+      case 'subtitle':
+        baseStyle.fontSize = fontSize.lg || 18;
+        break;
+      case 'caption':
+        baseStyle.fontSize = fontSize.sm;
+        break;
+      case 'small':
+        baseStyle.fontSize = fontSize.xs;
+        break;
+      default:
+        baseStyle.fontSize = fontSize.md;
+    }
+
+    // Font weight
+    switch (weight) {
+      case 'medium':
+        baseStyle.fontWeight = '500';
+        break;
+      case 'semibold':
+        baseStyle.fontWeight = '600';
+        break;
+      case 'bold':
+        baseStyle.fontWeight = '700';
+        break;
+      default:
+        baseStyle.fontWeight = '400';
+    }
+
+    // Color
+    switch (color) {
+      case 'primary':
+        baseStyle.color = theme.primary;
+        break;
+      case 'secondary':
+        baseStyle.color = theme.secondary;
+        break;
+      case 'textSecondary':
+        baseStyle.color = theme.textSecondary;
+        break;
+      case 'textLight':
+        baseStyle.color = theme.textLight;
+        break;
+      case 'white':
+        baseStyle.color = '#ffffff';
+        break;
+      default:
+        baseStyle.color = theme.text;
+    }
+
+    return baseStyle;
+  };
+
+  return <RNText style={[getTextStyle(), style]} numberOfLines={numberOfLines}>{children}</RNText>;
+};

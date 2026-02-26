@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Cricket Pulse",
+    "slug": "cricket-pulse",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#1e40af"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#1e40af"
+      },
+      "statusBar": {
+        "translucent": false,
+        "backgroundColor": "#1877f2"
+      }
+    }
+  }
+}
