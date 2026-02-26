@@ -123,7 +123,7 @@ export const SeriesScreen: React.FC = () => {
           tabBarInactiveTintColor: theme.textSecondary,
           tabBarIndicatorStyle: { backgroundColor: theme.primary },
           tabBarStyle: { backgroundColor: theme.surface },
-          tabBarLabelStyle: { fontWeight: 'bold', textTransform: 'capitalize' },
+          tabBarLabelStyle: { fontWeight: 'bold', textTransform: 'capitalize', minWidth: 100, flex: 1 },
           lazy: true,
         }}
       >

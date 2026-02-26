@@ -6,9 +6,13 @@ import { Text as ThemedText } from '@/components/ui/Text';
 import { Card } from '@/components/ui/Card';
 import { spacing } from '@/theme';
 
-export const MatchesScreen: React.FC = () => {
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+
+const Tab = createMaterialTopTabNavigator();
+
+const MatchList = ({ route }: any) => {
   const { theme } = useTheme();
-  const [activeTab, setActiveTab] = React.useState<'live' | 'upcoming' | 'recent'>('live');
+  const activeTab = route.name.toLowerCase();
 
   const matches = [
     { id: '1', series: 'ICC World Cup 2024', format: 'ODI', team1: 'India', team1Code: 'IND', team1Score: '287/4', team1Overs: '45.2', team2: 'Australia', team2Code: 'AUS', team2Score: '180/6', team2Overs: '32.1', status: 'live', venue: 'Wankhede Stadium', info: 'IND need 108 runs', odds1: '80', odds2: '90' },
@@ -93,28 +97,6 @@ export const MatchesScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <LinearGradient colors={[theme.primary, theme.primary + 'dd']} style={styles.header}>
-        <ThemedText variant="title" color="white" weight="bold">Matches</ThemedText>
-      </LinearGradient>
-
-      <View style={[styles.tabContainer, { backgroundColor: theme.surface }]}>
-        {(['live', 'upcoming', 'recent'] as const).map(tab => (
-          <TouchableOpacity
-            key={tab}
-            style={[styles.tab, activeTab === tab && { borderBottomColor: theme.primary }]}
-            onPress={() => setActiveTab(tab)}
-          >
-            <ThemedText
-              variant="body"
-              weight={activeTab === tab ? 'bold' : undefined}
-              color={activeTab === tab ? 'primary' : 'textSecondary'}
-            >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </ThemedText>
-          </TouchableOpacity>
-        ))}
-      </View>
-
       <FlatList
         data={filteredMatches}
         renderItem={renderMatch}
@@ -122,6 +104,31 @@ export const MatchesScreen: React.FC = () => {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       />
+    </View>
+  );
+};
+
+export const MatchesScreen: React.FC = () => {
+  const { theme } = useTheme();
+
+  return (
+    <View style={styles.container}>
+      <LinearGradient colors={[theme.primary, theme.primary + 'dd']} style={styles.header}>
+        <ThemedText variant="title" color="white" weight="bold">Matches</ThemedText>
+      </LinearGradient>
+      <Tab.Navigator
+        screenOptions={{
+          tabBarStyle: { backgroundColor: theme.surface },
+          tabBarIndicatorStyle: { backgroundColor: theme.primary, height: 3 },
+          tabBarLabelStyle: { fontWeight: 'bold', textTransform: 'capitalize' },
+          tabBarActiveTintColor: theme.primary,
+          tabBarInactiveTintColor: theme.textSecondary,
+        }}
+      >
+        <Tab.Screen name="Live" component={MatchList} />
+        <Tab.Screen name="Upcoming" component={MatchList} />
+        <Tab.Screen name="Recent" component={MatchList} />
+      </Tab.Navigator>
     </View>
   );
 };
