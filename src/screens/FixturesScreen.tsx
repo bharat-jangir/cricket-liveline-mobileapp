@@ -17,6 +17,13 @@ import { Card } from '../components/ui/Card';
 import { spacing, borderRadius } from '../theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+const getLocalYMD = (d: Date) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 type MatchFormat = 'All' | 'T20' | 'ODI' | 'Test';
 
 interface Match {
@@ -54,7 +61,7 @@ const generateMatches = (startDate: Date, count: number, direction: 'past' | 'fu
     const date = new Date(startDate);
     date.setDate(date.getDate() + (direction === 'future' ? i : -i));
     const matchesPerDay = Math.floor(Math.random() * 2) + 2;
-    
+
     for (let j = 0; j < matchesPerDay; j++) {
       const team1 = teams[Math.floor(Math.random() * teams.length)];
       let team2 = teams[Math.floor(Math.random() * teams.length)];
@@ -64,7 +71,7 @@ const generateMatches = (startDate: Date, count: number, direction: 'past' | 'fu
 
       matches.push({
         id: `${direction}-${date.getTime()}-${j}`,
-        date: date.toISOString().split('T')[0],
+        date: getLocalYMD(date),
         series: series[Math.floor(Math.random() * series.length)],
         format: formats[Math.floor(Math.random() * formats.length)],
         team1,
@@ -81,7 +88,7 @@ export const FixturesScreen: React.FC = () => {
   const { theme } = useTheme();
   const sectionListRef = useRef<SectionList>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
-  
+
   const [rawMatches, setRawMatches] = useState<Match[]>([]);
   const [selectedFormat, setSelectedFormat] = useState<MatchFormat>('All');
   const [showTodayBtn, setShowTodayBtn] = useState(false);
@@ -90,15 +97,15 @@ export const FixturesScreen: React.FC = () => {
   const [currentVisibleSection, setCurrentVisibleSection] = useState<string>('');
   const insets = useSafeAreaInsets();
 
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayStr = useMemo(() => getLocalYMD(new Date()), []);
 
   const formatDateHeader = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const matchDate = new Date(date);
-    matchDate.setHours(0, 0, 0, 0);
-    const diffDays = Math.ceil((matchDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    const diffDays = Math.round((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Tomorrow';
@@ -106,7 +113,7 @@ export const FixturesScreen: React.FC = () => {
 
     const currentYear = today.getFullYear();
     const matchYear = date.getFullYear();
-    
+
     if (currentYear === matchYear) {
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }
@@ -133,19 +140,26 @@ export const FixturesScreen: React.FC = () => {
   }, []);
 
   const jumpToDate = (date: Date) => {
-    const dateStr = date.toISOString().split('T')[0];
-    const index = sections.findIndex(s => s.date === dateStr);
+    const dateStr = getLocalYMD(date);
+    const targetTitle = formatDateHeader(dateStr); // Use the formatter to get the actual section title
+
+    // Find the section where either the title or the raw date matches
+    const index = sections.findIndex(s => s.title === targetTitle || s.date === dateStr);
+
     if (index >= 0) {
+      // Small delay ensures the SectionList is ready and the Modal is closing
       setTimeout(() => {
         sectionListRef.current?.scrollToLocation({
           sectionIndex: index,
           itemIndex: 0,
           animated: true,
-          viewOffset: 0,
+          viewOffset: 0, // Adjust this if you have a sticky header covering the item
         });
       }, 100);
-      setShowCalendar(false);
+    } else {
+      console.warn("Date not found in list");
     }
+    setShowCalendar(false);
   };
 
   const jumpToToday = () => jumpToDate(new Date());
@@ -179,7 +193,7 @@ export const FixturesScreen: React.FC = () => {
 
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(currentYear, currentMonth, day);
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = getLocalYMD(date);
       const hasMatches = rawMatches.some(m => m.date === dateStr);
       const isToday = dateStr === todayStr;
 
@@ -223,29 +237,29 @@ export const FixturesScreen: React.FC = () => {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background}]}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <LinearGradient colors={[theme.primary, '#42a5f5']} style={styles.header}>
-          <ThemedText variant="title" color="white" weight="bold" style={styles.headerTitle}>Fixtures</ThemedText>
-          
-          <View style={styles.filterContainer}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-              {(['All', 'T20', 'ODI', 'Test'] as MatchFormat[]).map((fmt) => (
-                <TouchableOpacity
-                  key={fmt}
-                  onPress={() => setSelectedFormat(fmt)}
-                  style={[styles.filterTab, selectedFormat === fmt && styles.activeTab]}
-                >
-                  <ThemedText variant="small" weight="bold" style={{ color: selectedFormat === fmt ? theme.primary : 'white' }}>
-                    {fmt}
-                  </ThemedText>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            
-            <TouchableOpacity style={styles.calendarBtn} onPress={() => setShowCalendar(true)}>
-              <Ionicons name="calendar-outline" size={22} color="white" />
-            </TouchableOpacity>
-          </View>
+        <ThemedText variant="title" color="white" weight="bold" style={styles.headerTitle}>Fixtures</ThemedText>
+
+        <View style={styles.filterContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+            {(['All', 'T20', 'ODI', 'Test'] as MatchFormat[]).map((fmt) => (
+              <TouchableOpacity
+                key={fmt}
+                onPress={() => setSelectedFormat(fmt)}
+                style={[styles.filterTab, selectedFormat === fmt && styles.activeTab]}
+              >
+                <ThemedText variant="small" weight="bold" style={{ color: selectedFormat === fmt ? theme.primary : 'white' }}>
+                  {fmt}
+                </ThemedText>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          <TouchableOpacity style={styles.calendarBtn} onPress={() => setShowCalendar(true)}>
+            <Ionicons name="calendar-outline" size={22} color="white" />
+          </TouchableOpacity>
+        </View>
       </LinearGradient>
 
       <SectionList
@@ -256,6 +270,23 @@ export const FixturesScreen: React.FC = () => {
         onViewableItemsChanged={handleViewableItemsChanged}
         viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
         stickySectionHeadersEnabled={true}
+        onScrollToIndexFailed={(info) => {
+          setTimeout(() => {
+            sectionListRef.current?.scrollToLocation({
+              sectionIndex: info.highestMeasuredFrameIndex,
+              itemIndex: 0,
+              animated: false,
+            });
+            setTimeout(() => {
+              sectionListRef.current?.scrollToLocation({
+                sectionIndex: info.index,
+                itemIndex: 0,
+                animated: true,
+                viewOffset: 0,
+              });
+            }, 100);
+          }, 100);
+        }}
         renderSectionHeader={({ section }) => (
           <View style={[styles.sectionHeader, { backgroundColor: theme.background }]}>
             <ThemedText variant="small" weight="bold" style={{ color: theme.primary }}>
@@ -265,15 +296,18 @@ export const FixturesScreen: React.FC = () => {
         )}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: 120 }}
+        initialNumToRender={100}
+        maxToRenderPerBatch={30}
+        windowSize={11}
         ListEmptyComponent={<View style={styles.empty}><ThemedText>No matches for this format</ThemedText></View>}
       />
 
       {showTodayBtn && (
         <Animated.View style={styles.floatingContainer}>
-          <TouchableOpacity 
-            style={[styles.todayFab, { backgroundColor: theme.primary }]} 
+          <TouchableOpacity
+            style={[styles.todayFab, { backgroundColor: theme.primary }]}
             onPress={jumpToToday}
-            activeOpacity={0.9}
+            activeOpacity={0.7}
           >
             <Ionicons name="today" size={18} color="white" />
             <ThemedText variant="small" weight="bold" color="white" style={{ marginLeft: 4 }}>TODAY</ThemedText>

@@ -22,7 +22,8 @@
       "statusBar": {
         "translucent": false,
         "backgroundColor": "#1877f2"
-      }
+      },
+      "package": "com.anonymous.cricketpulse"
     }
   }
 }
