@@ -22,6 +22,7 @@ import { MatchesScreen, NewsScreen, ProfileScreen } from '@/screens/index';
 import { RankingsScreen } from '@/screens/RankingsScreen';
 import { AllNewsScreen } from '@/screens/AllNewsScreen';
 import { NewsDetailScreen } from '@/screens/NewsDetailScreen';
+import { VenueDetailScreen } from '@/screens/VenueDetailScreen';
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -37,6 +38,7 @@ export type RootStackParamList = {
   MatchDetails: { matchId: string };
   PlayerProfile: { playerId: string };
   SeriesDetails: { seriesId: string };
+  VenueDetail: { venueId: string };
 };
 
 export type MainTabParamList = {
@@ -173,6 +175,11 @@ const AppNavigator = () => {
       <Stack.Screen
         name="SeriesDetail"
         component={SeriesDetailScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="VenueDetail"
+        component={VenueDetailScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen
