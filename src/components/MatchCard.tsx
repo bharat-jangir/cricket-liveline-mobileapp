@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { Text } from './ui/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
@@ -51,7 +52,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match, onPress }) => {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Ionicons name="trophy" size={16} color="#A3E635" />
-          <Text style={[styles.seriesText, { color: theme.textSecondary }]}>
+          <Text numberOfLines={1} style={[styles.seriesText, { color: theme.textSecondary, flex: 1, marginRight: spacing.sm }]}>
             {match.series}
           </Text>
         </View>
@@ -87,7 +88,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match, onPress }) => {
             >
               <Text style={styles.teamCode}>{match.team1.code}</Text>
             </LinearGradient>
-            <Text style={[styles.teamName, { color: theme.text }]}>
+            <Text numberOfLines={1} style={[styles.teamName, { color: theme.text, flex: 1 }]}>
               {match.team1.name}
             </Text>
           </View>
@@ -112,7 +113,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match, onPress }) => {
             >
               <Text style={styles.teamCode}>{match.team2.code}</Text>
             </LinearGradient>
-            <Text style={[styles.teamName, { color: theme.text }]}>
+            <Text numberOfLines={1} style={[styles.teamName, { color: theme.text, flex: 1 }]}>
               {match.team2.name}
             </Text>
           </View>
@@ -133,7 +134,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match, onPress }) => {
       <View style={[styles.footer, { borderTopColor: theme.border }]}>
         <View style={styles.footerLeft}>
           <Ionicons name="location-outline" size={12} color={theme.textSecondary} />
-          <Text style={[styles.venue, { color: theme.textSecondary }]}>
+          <Text numberOfLines={1} style={[styles.venue, { color: theme.textSecondary, flex: 1 }]}>
             {match.venue}
           </Text>
         </View>
@@ -155,7 +156,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match, onPress }) => {
       {/* Result */}
       {match.result && (
         <View style={styles.resultContainer}>
-          <Text style={styles.resultText}>{match.result}</Text>
+          <Text numberOfLines={1} style={styles.resultText}>{match.result}</Text>
         </View>
       )}
     </TouchableOpacity>

@@ -146,3 +146,202 @@ export const completedMatches: Match[] = [
     result: 'Australia won by 7 wickets'
   }
 ];
+
+export interface Venue {
+  id: string;
+  name: string;
+  city: string;
+  country: string;
+  image: string;
+  capacity?: string;
+}
+
+export const mockVenues: Venue[] = [
+  {
+    id: 'v1',
+    name: 'Narendra Modi Stadium',
+    city: 'Ahmedabad',
+    country: 'India',
+    image: 'https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
+    capacity: '132,000'
+  },
+  {
+    id: 'v2',
+    name: 'Wankhede Stadium',
+    city: 'Mumbai',
+    country: 'India',
+    image: 'https://images.unsplash.com/photo-1531415074968-036ba1b575da?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
+    capacity: '33,108'
+  },
+  {
+    id: 'v3',
+    name: 'Eden Gardens',
+    city: 'Kolkata',
+    country: 'India',
+    image: 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
+    capacity: '68,000'
+  },
+  {
+    id: 'v4',
+    name: 'Lord\'s Cricket Ground',
+    city: 'London',
+    country: 'England',
+    image: 'https://images.unsplash.com/photo-1624526267923-a128af55f756?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
+    capacity: '30,000'
+  },
+  {
+    id: 'v5',
+    name: 'Melbourne Cricket Ground',
+    city: 'Melbourne',
+    country: 'Australia',
+    image: 'https://images.unsplash.com/photo-1563291074-2bf8677ac0e5?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
+    capacity: '100,024'
+  },
+  {
+    id: 'v6',
+    name: 'Sydney Cricket Ground',
+    city: 'Sydney',
+    country: 'Australia',
+    image: 'https://images.unsplash.com/photo-1629813284000-dcbd9aeb24e4?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
+    capacity: '48,000'
+  }
+];
+
+export interface PlayerStats {
+  matches: string;
+  runs?: string;
+  wickets?: string;
+  average?: string;
+  strikeRate?: string;
+  economy?: string;
+  highScore?: string;
+  bestBowling?: string;
+  hundreds?: string;
+  fifties?: string;
+  fiveWickets?: string;
+}
+
+export interface Player {
+  id: string;
+  name: string;
+  country: string;
+  role: 'Batsman' | 'Bowler' | 'All-Rounder';
+  battingStyle: string;
+  bowlingStyle: string;
+  image: string;
+  age: string;
+  birthPlace: string;
+  teams: string[];
+  recentMatches?: string[]; // IDs reference 'completedMatches'
+  recentNews?: { id: string, title: string, date: string, image: string }[];
+  stats: {
+    test: PlayerStats;
+    odi: PlayerStats;
+    t20i: PlayerStats;
+  };
+}
+
+export const mockPlayers: Player[] = [
+  {
+    id: 'p1',
+    name: 'Virat Kohli',
+    country: 'India',
+    role: 'Batsman',
+    battingStyle: 'Right-hand bat',
+    bowlingStyle: 'Right-arm medium',
+    image: 'https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?ixlib=rb-1.2.1&auto=format&fit=crop&w=400&q=80',
+    age: '35',
+    birthPlace: 'Delhi, India',
+    teams: ['India', 'Royal Challengers Bangalore', 'Delhi'],
+    stats: {
+      test: { matches: '113', runs: '8848', average: '49.15', highScore: '254*', hundreds: '29', fifties: '30' },
+      odi: { matches: '292', runs: '13848', average: '58.67', strikeRate: '93.62', highScore: '183', hundreds: '50', fifties: '72' },
+      t20i: { matches: '117', runs: '4037', average: '51.75', strikeRate: '138.15', highScore: '122*', hundreds: '1', fifties: '37' },
+    }
+  },
+  {
+    id: 'p2',
+    name: 'Pat Cummins',
+    country: 'Australia',
+    role: 'Bowler',
+    battingStyle: 'Right-hand bat',
+    bowlingStyle: 'Right-arm fast',
+    image: 'https://images.unsplash.com/photo-1531415074968-036ba1b575da?ixlib=rb-1.2.1&auto=format&fit=crop&w=400&q=80',
+    age: '30',
+    birthPlace: 'Westmead, Sydney',
+    teams: ['Australia', 'Sunrisers Hyderabad', 'New South Wales'],
+    stats: {
+      test: { matches: '58', wickets: '258', average: '22.45', economy: '2.77', bestBowling: '6/23', fiveWickets: '10' },
+      odi: { matches: '82', wickets: '136', average: '27.91', economy: '5.29', bestBowling: '5/70', fiveWickets: '1' },
+      t20i: { matches: '52', wickets: '57', average: '24.12', economy: '7.36', bestBowling: '3/15', fiveWickets: '0' },
+    }
+  },
+  {
+    id: 'p3',
+    name: 'Ben Stokes',
+    country: 'England',
+    role: 'All-Rounder',
+    battingStyle: 'Left-hand bat',
+    bowlingStyle: 'Right-arm fast-medium',
+    image: 'https://images.unsplash.com/photo-1624526267923-a128af55f756?ixlib=rb-1.2.1&auto=format&fit=crop&w=400&q=80',
+    age: '32',
+    birthPlace: 'Christchurch, New Zealand',
+    teams: ['England', 'Chennai Super Kings', 'Durham'],
+    stats: {
+      test: { matches: '100', runs: '6251', wickets: '197', average: '35.31', economy: '3.31', hundreds: '13', fiveWickets: '4' },
+      odi: { matches: '114', runs: '3463', wickets: '74', average: '40.26', economy: '6.05', hundreds: '5', fiveWickets: '1' },
+      t20i: { matches: '43', runs: '585', wickets: '26', average: '21.66', economy: '8.39', hundreds: '0', fiveWickets: '0' },
+    }
+  },
+  {
+    id: 'p4',
+    name: 'Babar Azam',
+    country: 'Pakistan',
+    role: 'Batsman',
+    battingStyle: 'Right-hand bat',
+    bowlingStyle: 'Right-arm offbreak',
+    image: 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?ixlib=rb-1.2.1&auto=format&fit=crop&w=400&q=80',
+    age: '29',
+    birthPlace: 'Lahore, Punjab',
+    teams: ['Pakistan', 'Peshawar Zalmi', 'Karachi Kings'],
+    stats: {
+      test: { matches: '52', runs: '3898', average: '45.85', highScore: '196', hundreds: '9', fifties: '26' },
+      odi: { matches: '117', runs: '5729', average: '56.72', strikeRate: '88.75', highScore: '158', hundreds: '19', fifties: '32' },
+      t20i: { matches: '109', runs: '3698', average: '41.55', strikeRate: '129.12', highScore: '122', hundreds: '3', fifties: '33' },
+    }
+  },
+  {
+    id: 'p5',
+    name: 'Rashid Khan',
+    country: 'Afghanistan',
+    role: 'Bowler',
+    battingStyle: 'Right-hand bat',
+    bowlingStyle: 'Right-arm legbreak',
+    image: 'https://images.unsplash.com/photo-1563291074-2bf8677ac0e5?ixlib=rb-1.2.1&auto=format&fit=crop&w=400&q=80',
+    age: '25',
+    birthPlace: 'Nangarhar, Afghanistan',
+    teams: ['Afghanistan', 'Gujarat Titans', 'Adelaide Strikers'],
+    stats: {
+      test: { matches: '5', wickets: '34', average: '22.35', economy: '3.08', bestBowling: '7/137', fiveWickets: '4' },
+      odi: { matches: '103', wickets: '183', average: '20.53', economy: '4.21', bestBowling: '7/18', fiveWickets: '4' },
+      t20i: { matches: '85', wickets: '138', average: '14.27', economy: '6.07', bestBowling: '5/3', fiveWickets: '2' },
+    }
+  },
+  {
+    id: 'p6',
+    name: 'Jasprit Bumrah',
+    country: 'India',
+    role: 'Bowler',
+    battingStyle: 'Right-hand bat',
+    bowlingStyle: 'Right-arm fast',
+    image: 'https://images.unsplash.com/photo-1629813284000-dcbd9aeb24e4?ixlib=rb-1.2.1&auto=format&fit=crop&w=400&q=80',
+    age: '30',
+    birthPlace: 'Ahmedabad, Gujarat',
+    teams: ['India', 'Mumbai Indians', 'Gujarat'],
+    stats: {
+      test: { matches: '34', wickets: '146', average: '20.69', economy: '2.74', bestBowling: '6/27', fiveWickets: '9' },
+      odi: { matches: '89', wickets: '149', average: '23.55', economy: '4.59', bestBowling: '6/19', fiveWickets: '2' },
+      t20i: { matches: '62', wickets: '74', average: '19.66', economy: '6.55', bestBowling: '3/11', fiveWickets: '0' },
+    }
+  },
+];

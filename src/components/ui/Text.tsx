@@ -89,5 +89,5 @@ export const Text: React.FC<TextProps> = ({
     return baseStyle;
   };
 
-  return <RNText style={[getTextStyle(), style]} numberOfLines={numberOfLines}>{children}</RNText>;
+  return <RNText style={[getTextStyle(), style]} numberOfLines={numberOfLines} allowFontScaling={false}>{children}</RNText>;
 };
