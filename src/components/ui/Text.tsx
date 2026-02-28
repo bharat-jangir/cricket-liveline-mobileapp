@@ -6,7 +6,7 @@ import { fontSize } from '@/theme';
 interface TextProps {
   children: React.ReactNode;
   variant?: 'heading' | 'title' | 'subtitle' | 'body' | 'caption' | 'small';
-  color?: 'primary' | 'secondary' | 'text' | 'textSecondary' | 'textLight' | 'white';
+  color?: 'primary' | 'secondary' | 'text' | 'textSecondary' | 'textLight' | 'white' | 'error' | 'success';
   weight?: 'normal' | 'medium' | 'semibold' | 'bold';
   align?: 'left' | 'center' | 'right';
   numberOfLines?: number;
@@ -81,6 +81,12 @@ export const Text: React.FC<TextProps> = ({
         break;
       case 'white':
         baseStyle.color = '#ffffff';
+        break;
+      case 'error':
+        baseStyle.color = theme.error;
+        break;
+      case 'success':
+        baseStyle.color = theme.success;
         break;
       default:
         baseStyle.color = theme.text;

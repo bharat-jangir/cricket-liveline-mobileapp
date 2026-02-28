@@ -344,7 +344,7 @@ export const HomeScreen: React.FC = () => {
               <ThemedText style={[styles.breadcrumbText, { color: theme.text, backgroundColor: isDark ? theme.border : theme.primary + '10' }]}>Rankings <Ionicons name="chevron-forward" size={14} color={theme.text} /></ThemedText>
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => console.log('Market Book pressed')}>
+            <TouchableOpacity onPress={() => navigation.navigate('MatchLedger')}>
               <ThemedText style={[styles.breadcrumbText, { color: theme.text, backgroundColor: isDark ? theme.border : theme.primary + '10' }]}>Market Book <Ionicons name="chevron-forward" size={14} color={theme.text} /></ThemedText>
             </TouchableOpacity>
           </ScrollView>

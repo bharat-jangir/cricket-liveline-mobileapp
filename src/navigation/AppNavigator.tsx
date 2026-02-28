@@ -27,6 +27,7 @@ import { AllVenuesScreen } from '@/screens/AllVenuesScreen';
 import { AllPlayersScreen } from '@/screens/AllPlayersScreen';
 import { PlayerProfileScreen } from '@/screens/PlayerProfileScreen';
 import { MatchDetailScreen } from '@/screens/MatchDetailScreen';
+import { MatchLedgerScreen } from '@/screens/MatchLedgerScreen';
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -44,6 +45,7 @@ export type RootStackParamList = {
   VenueDetail: { venueId: string };
   AllVenues: undefined;
   AllPlayers: undefined;
+  MatchLedger: { matchId?: string; autoOpenAddEntry?: boolean } | undefined;
 };
 
 export type MainTabParamList = {
@@ -201,6 +203,11 @@ const AppNavigator = () => {
       <Stack.Screen
         name="MatchDetails"
         component={MatchDetailScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="MatchLedger"
+        component={MatchLedgerScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

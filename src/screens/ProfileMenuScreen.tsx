@@ -28,6 +28,7 @@ export const ProfileMenuScreen: React.FC = () => {
         { id: 'series', title: 'All Series', icon: 'trophy', screen: 'Series' },
         { id: 'venues', title: 'All Venues', icon: 'location', screen: 'AllVenues' },
         { id: 'players', title: 'Players', icon: 'people', screen: 'Players' },
+        { id: 'ledger', title: 'Account Book', icon: 'book', screen: 'MatchLedger' },
     ];
 
     const settingsItems = [
@@ -106,6 +107,8 @@ export const ProfileMenuScreen: React.FC = () => {
                                     navigation.navigate('AllVenues');
                                 } else if (item.screen === 'Players') {
                                     navigation.navigate('AllPlayers');
+                                } else if (item.screen === 'MatchLedger') {
+                                    navigation.navigate('MatchLedger' as any);
                                 }
                             }}
                         >

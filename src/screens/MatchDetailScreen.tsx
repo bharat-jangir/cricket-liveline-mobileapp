@@ -7,16 +7,23 @@ import {
     Dimensions,
     Image,
     SafeAreaView,
+    Modal,
+    TextInput,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { createMaterialTopTabNavigator, MaterialTopTabBar } from '@react-navigation/material-top-tabs';
-import BottomSheet, { BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetScrollView, BottomSheetBackdrop, BottomSheetBackdropProps } from '@gorhom/bottom-sheet';
 import { useTheme } from '../theme/ThemeContext';
-import { spacing, fontSize, borderRadius } from '../theme';
+import { spacing, fontSize, borderRadius, elevation } from '../theme';
 import { Text as ThemedText } from '../components/ui/Text';
 import { Card } from '../components/ui/Card';
 import { RootStackParamList } from '../navigation/AppNavigator';
+
+type MatchDetailNavigationProp = StackNavigationProp<RootStackParamList, 'MatchDetails'>;
 
 const Tab = createMaterialTopTabNavigator();
 const { width } = Dimensions.get('window');
@@ -63,7 +70,7 @@ const H2H_DATA = {
 
 const InfoTab = ({ onTeamPress }: { onTeamPress: (team: 'WP' | 'LIO') => void }) => {
     const { theme, isDark } = useTheme();
-    const navigation = useNavigation<any>();
+    const navigation = useNavigation<MatchDetailNavigationProp>();
 
     return (
         <ScrollView style={[styles.tabContent, { backgroundColor: theme.background }]}>
@@ -91,7 +98,7 @@ const InfoTab = ({ onTeamPress }: { onTeamPress: (team: 'WP' | 'LIO') => void })
                 </View>
                 <View style={[styles.infoRow, { borderBottomColor: theme.border + '50' }]}>
                     <ThemedText color="textSecondary" style={styles.infoLabel}>Venue</ThemedText>
-                    <TouchableOpacity onPress={() => navigation.navigate('VenueDetails' as any, { venueId: 'newlands' } as never)}>
+                    <TouchableOpacity onPress={() => navigation.navigate('VenueDetail', { venueId: 'newlands' })}>
                         <ThemedText color="primary" weight="medium" style={styles.infoValue}>Newlands, Cape Town</ThemedText>
                     </TouchableOpacity>
                 </View>
@@ -360,150 +367,336 @@ const ScoreSummaryHeader = () => {
     );
 };
 
-const LiveTab = () => {
+const BET_CATEGORIES = ['Match Odds', 'Session', 'Fancy', 'Tied Match', 'Custom'];
+
+const LiveTab = ({ navigation, matchId }: { navigation: MatchDetailNavigationProp, matchId: string }) => {
     const { theme, isDark } = useTheme();
 
+    // Add Entry State
+    const [isAddEntryVisible, setIsAddEntryVisible] = useState(false);
+    const [newClientName, setNewClientName] = useState('');
+    const [newAmount, setNewAmount] = useState('');
+    const [newRate, setNewRate] = useState('');
+    const [newCategory, setNewCategory] = useState(BET_CATEGORIES[0]);
+    const [newSessionChoice, setNewSessionChoice] = useState<'Yes' | 'No'>('Yes');
+    const [newType, setNewType] = useState<'plus' | 'minus' | 'pending'>('pending');
+    const [isCategorySelectorVisible, setIsCategorySelectorVisible] = useState(false);
+
+    const handleAddEntry = () => {
+        if (!newClientName.trim() || !newAmount || isNaN(Number(newAmount))) {
+            alert("Please enter a valid client name and amount.");
+            return;
+        }
+
+        // Mock saving entry - in a real app this would call an API or update a global store
+        alert(`Entry saved for ${newClientName}: ₹${newAmount} against ${matchId}`);
+
+        setIsAddEntryVisible(false);
+        setNewClientName('');
+        setNewAmount('');
+        setNewRate('');
+        setNewType('pending');
+        setNewCategory(BET_CATEGORIES[0]);
+        setNewSessionChoice('Yes');
+    };
+
     return (
-        <ScrollView style={[styles.tabContent, { backgroundColor: theme.background }]}>
-            <View style={[styles.overSummaryRow, { backgroundColor: isDark ? theme.surface : theme.background, borderBottomColor: theme.border }]}>
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.overScrollContent}
+        <View style={styles.tabContentContainer}>
+            <ScrollView style={[styles.tabContent, { backgroundColor: theme.background }]}>
+                <View style={[styles.overSummaryRow, { backgroundColor: isDark ? theme.surface : theme.background, borderBottomColor: theme.border }]}>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.overScrollContent}
+                    >
+                        <View style={styles.overBallsRow}>
+                            <ThemedText color="textSecondary" variant="small">0 = 7</ThemedText>
+                            <ThemedText weight="bold" variant="small">Over 10</ThemedText>
+                            <View style={[styles.overBall, { backgroundColor: theme.borderLight, borderColor: theme.border, borderWidth: 1 }]}><ThemedText variant="small">2</ThemedText></View>
+                            <View style={[styles.overBall, { backgroundColor: theme.borderLight, borderColor: theme.border, borderWidth: 1 }]}><ThemedText variant="small">1</ThemedText></View>
+                            <View style={[styles.overBall, styles.boundaryBall]}><ThemedText color="white" variant="small" weight="bold">4</ThemedText></View>
+                            <View style={[styles.overBall, { backgroundColor: theme.borderLight, borderColor: theme.border, borderWidth: 1 }]}><ThemedText variant="small">0</ThemedText></View>
+                            <View style={[styles.overBall, { backgroundColor: theme.borderLight, borderColor: theme.border, borderWidth: 1 }]}><ThemedText variant="small">6</ThemedText></View>
+                            <View style={[styles.overBall, { backgroundColor: theme.borderLight, borderColor: theme.border, borderWidth: 1 }]}><ThemedText variant="small">wd</ThemedText></View>
+                            <View style={[styles.overBall, { backgroundColor: theme.borderLight, borderColor: theme.border, borderWidth: 1 }]}><ThemedText variant="small">1</ThemedText></View>
+                            <View style={[styles.overBall, { backgroundColor: theme.borderLight, borderColor: theme.border, borderWidth: 1 }]}><ThemedText variant="small">0</ThemedText></View>
+                            <View style={[styles.overBallPlaceholder, { borderColor: theme.border }]} />
+                            <ThemedText color="textSecondary" variant="small">{`= 7 Overs >`}</ThemedText>
+                        </View>
+                    </ScrollView>
+                </View>
+
+                <View style={styles.liveTeamHeader}>
+                    <View style={styles.teamLabelRow}>
+                        <ThemedText weight="bold">Western Province</ThemedText>
+                        <Ionicons name="information-circle-outline" size={14} color={theme.textSecondary} />
+                    </View>
+                    <View style={styles.teamScoreBadges}>
+                        <View style={[styles.badgeLabel, { backgroundColor: theme.borderLight }]}>
+                            <ThemedText variant="small" weight="bold">WP</ThemedText>
+                            <Ionicons name="flashlight" size={12} color={theme.primary} />
+                        </View>
+                        <View style={[styles.statValueBox, { backgroundColor: '#1d4ed8' }]}>
+                            <ThemedText variant="small" weight="bold" color="white">63</ThemedText>
+                        </View>
+                        <View style={[styles.statValueBox, { backgroundColor: '#991b1b' }]}>
+                            <ThemedText variant="small" weight="bold" color="white">70</ThemedText>
+                        </View>
+                    </View>
+                </View>
+
+                <View style={styles.statsTable}>
+                    <View style={[styles.tableHeader, { borderBottomColor: theme.border }]}>
+                        <ThemedText variant="caption" color="textSecondary" style={styles.colBatter}>Batter</ThemedText>
+                        <ThemedText variant="caption" color="textSecondary" style={styles.colStatSmall}>R (B)</ThemedText>
+                        <ThemedText variant="caption" color="textSecondary" style={styles.colStatSmall}>4s</ThemedText>
+                        <ThemedText variant="caption" color="textSecondary" style={styles.colStatSmall}>6s</ThemedText>
+                        <ThemedText variant="caption" color="textSecondary" style={styles.colStatSmall}>SR</ThemedText>
+                    </View>
+                    <View style={[styles.tableRow, { borderBottomColor: theme.border }]}>
+                        <ThemedText weight="bold" style={styles.colBatter} color="primary">Tony de Zorzi</ThemedText>
+                        <ThemedText style={styles.colStatSmall}>47 (35)</ThemedText>
+                        <ThemedText style={styles.colStatSmall}>5</ThemedText>
+                        <ThemedText style={styles.colStatSmall}>2</ThemedText>
+                        <ThemedText style={styles.colStatSmall}>134.3</ThemedText>
+                        <Ionicons name="chevron-down" size={14} color={theme.textLight} />
+                    </View>
+                    <View style={[styles.tableRow, { borderBottomColor: theme.border }]}>
+                        <View style={[styles.colBatter, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                            <ThemedText weight="bold" color="primary">D Bedingham</ThemedText>
+                            <Ionicons name="flashlight" size={12} color="#facc15" />
+                        </View>
+                        <ThemedText style={styles.colStatSmall}>15 (11)</ThemedText>
+                        <ThemedText style={styles.colStatSmall}>3</ThemedText>
+                        <ThemedText style={styles.colStatSmall}>0</ThemedText>
+                        <ThemedText style={styles.colStatSmall}>136.4</ThemedText>
+                        <Ionicons name="chevron-down" size={14} color={theme.textLight} />
+                    </View>
+                </View>
+
+                <View style={[styles.partnershipStrip, { backgroundColor: isDark ? theme.surface : theme.borderLight }]}>
+                    <ThemedText color="textSecondary" variant="small">{`P'ship: 46 (30) >`}</ThemedText>
+                    <ThemedText color="textSecondary" variant="small">Last wkt: V Kitime 10 (13)</ThemedText>
+                </View>
+
+                {/* Bowling Stats Table */}
+                <View style={styles.statsTable}>
+                    <View style={[styles.tableHeader, { borderBottomColor: theme.border }]}>
+                        <ThemedText variant="caption" color="textSecondary" style={styles.colBatter}>Bowler</ThemedText>
+                        <ThemedText variant="caption" color="textSecondary" style={styles.colStatSmall}>W-R</ThemedText>
+                        <ThemedText variant="caption" color="textSecondary" style={styles.colStatSmall}>Overs</ThemedText>
+                        <ThemedText variant="caption" color="textSecondary" style={styles.colStatSmall}>Econ</ThemedText>
+                    </View>
+                    <View style={[styles.tableRow, { borderBottomColor: theme.border }]}>
+                        <ThemedText weight="bold" style={styles.colBatter}>L Sipamla</ThemedText>
+                        <ThemedText style={styles.colStatSmall}>0-22</ThemedText>
+                        <ThemedText style={styles.colStatSmall}>1.5</ThemedText>
+                        <ThemedText style={styles.colStatSmall}>12.00</ThemedText>
+                        <Ionicons name="chevron-down" size={14} color={theme.textLight} />
+                    </View>
+                </View>
+
+                <View style={[styles.predictionSection, { backgroundColor: isDark ? theme.surface : theme.borderLight }]}>
+                    <View style={styles.predictionHeaderRow}>
+                        <ThemedText weight="bold">Who will win?</ThemedText>
+                        <ThemedText color="textSecondary" variant="caption">Total Votes: 36,179</ThemedText>
+                    </View>
+                    <View style={styles.predictionButtonsRow}>
+                        <TouchableOpacity style={[styles.predButton, { backgroundColor: theme.background, borderColor: theme.border }]}><ThemedText weight="bold">WP</ThemedText></TouchableOpacity>
+                        <TouchableOpacity style={[styles.predButton, { backgroundColor: theme.background, borderColor: theme.border }]}><ThemedText weight="bold">LIO</ThemedText></TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* Projected Score Table */}
+                <View style={[styles.projectedSection, { backgroundColor: isDark ? theme.surface : theme.borderLight, borderTopColor: theme.border, borderTopWidth: 1 }]}>
+                    <ThemedText color="textSecondary" variant="caption" weight="bold" style={{ marginBottom: spacing.md }}>PROJECTED SCORE</ThemedText>
+                    <View style={styles.projTable}>
+                        <View style={styles.projRow}>
+                            <ThemedText variant="caption" color="textSecondary" style={styles.projColHeader}>Run Rate</ThemedText>
+                            <ThemedText variant="caption" color="textSecondary" style={styles.projColValue}>20 overs</ThemedText>
+                            <ThemedText variant="caption" color="textSecondary" style={styles.projColValue}>50 overs</ThemedText>
+                        </View>
+                        <View style={styles.projRow}>
+                            <ThemedText color="primary" weight="bold" style={styles.projColHeader}>6.91*</ThemedText>
+                            <ThemedText weight="bold" style={styles.projColValue}>138</ThemedText>
+                            <ThemedText weight="bold" style={styles.projColValue}>345</ThemedText>
+                        </View>
+                        <View style={styles.projRow}>
+                            <ThemedText color="textSecondary" style={styles.projColHeader}>7.0</ThemedText>
+                            <ThemedText color="textSecondary" style={styles.projColValue}>140</ThemedText>
+                            <ThemedText color="textSecondary" style={styles.projColValue}>350</ThemedText>
+                        </View>
+                        <View style={[styles.projRow, { borderBottomWidth: 0 }]}>
+                            <ThemedText color="textSecondary" style={styles.projColHeader}>8.0</ThemedText>
+                            <ThemedText color="textSecondary" style={styles.projColValue}>160</ThemedText>
+                            <ThemedText color="textSecondary" style={styles.projColValue}>400</ThemedText>
+                        </View>
+                    </View>
+
+                    <View style={styles.notificationStrip}>
+                        <View style={[styles.notificationInner, { backgroundColor: theme.primary + '15', marginTop: spacing.md }]}>
+                            <Ionicons name="notifications-outline" size={18} color={theme.primary} />
+                            <ThemedText color="text" variant="small" style={{ flex: 1 }}>Turn on Updates for Match</ThemedText>
+                            <TouchableOpacity><ThemedText color="primary" weight="bold" variant="small">Turn On</ThemedText></TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </ScrollView>
+
+            {/* Floating Quick Entry Button */}
+            <TouchableOpacity
+                style={[styles.fab, { backgroundColor: theme.primary }]}
+                onPress={() => setIsAddEntryVisible(true)}
+            >
+                <Ionicons name="pencil" size={24} color="white" />
+            </TouchableOpacity>
+
+            {/* Independent Add Entry Modal */}
+            <Modal visible={isAddEntryVisible} transparent animationType="fade">
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.modalOverlay}
                 >
-                    <View style={styles.overBallsRow}>
-                        <ThemedText color="textSecondary" variant="small">0 = 7</ThemedText>
-                        <ThemedText weight="bold" variant="small">Over 10</ThemedText>
-                        <View style={[styles.overBall, { backgroundColor: theme.borderLight, borderColor: theme.border, borderWidth: 1 }]}><ThemedText variant="small">2</ThemedText></View>
-                        <View style={[styles.overBall, { backgroundColor: theme.borderLight, borderColor: theme.border, borderWidth: 1 }]}><ThemedText variant="small">1</ThemedText></View>
-                        <View style={[styles.overBall, styles.boundaryBall]}><ThemedText color="white" variant="small" weight="bold">4</ThemedText></View>
-                        <View style={[styles.overBall, { backgroundColor: theme.borderLight, borderColor: theme.border, borderWidth: 1 }]}><ThemedText variant="small">0</ThemedText></View>
-                        <View style={[styles.overBall, { backgroundColor: theme.borderLight, borderColor: theme.border, borderWidth: 1 }]}><ThemedText variant="small">6</ThemedText></View>
-                        <View style={[styles.overBall, { backgroundColor: theme.borderLight, borderColor: theme.border, borderWidth: 1 }]}><ThemedText variant="small">wd</ThemedText></View>
-                        <View style={[styles.overBall, { backgroundColor: theme.borderLight, borderColor: theme.border, borderWidth: 1 }]}><ThemedText variant="small">1</ThemedText></View>
-                        <View style={[styles.overBall, { backgroundColor: theme.borderLight, borderColor: theme.border, borderWidth: 1 }]}><ThemedText variant="small">0</ThemedText></View>
-                        <View style={[styles.overBallPlaceholder, { borderColor: theme.border }]} />
-                        <ThemedText color="textSecondary" variant="small">{`= 7 Overs >`}</ThemedText>
-                    </View>
-                </ScrollView>
-            </View>
+                    <TouchableOpacity style={styles.modalBg} onPress={() => setIsAddEntryVisible(false)} />
+                    <View style={[styles.dialogCard, { backgroundColor: theme.surface }]}>
+                        <ThemedText variant="subtitle" weight="bold" style={{ marginBottom: spacing.md }}>Add Entry (Live)</ThemedText>
 
-            <View style={styles.liveTeamHeader}>
-                <View style={styles.teamLabelRow}>
-                    <ThemedText weight="bold">Western Province</ThemedText>
-                    <Ionicons name="information-circle-outline" size={14} color={theme.textSecondary} />
-                </View>
-                <View style={styles.teamScoreBadges}>
-                    <View style={[styles.badgeLabel, { backgroundColor: theme.borderLight }]}>
-                        <ThemedText variant="small" weight="bold">WP</ThemedText>
-                        <Ionicons name="flashlight" size={12} color={theme.primary} />
-                    </View>
-                    <View style={[styles.statValueBox, { backgroundColor: '#1d4ed8' }]}>
-                        <ThemedText variant="small" weight="bold" color="white">63</ThemedText>
-                    </View>
-                    <View style={[styles.statValueBox, { backgroundColor: '#991b1b' }]}>
-                        <ThemedText variant="small" weight="bold" color="white">70</ThemedText>
-                    </View>
-                </View>
-            </View>
+                        <View style={{ marginBottom: spacing.md }}>
+                            <ThemedText variant="small" color="textSecondary" style={{ marginBottom: 4 }}>Client Name</ThemedText>
+                            <TextInput
+                                style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
+                                placeholder="Enter client name"
+                                placeholderTextColor={theme.textLight}
+                                value={newClientName}
+                                onChangeText={setNewClientName}
+                            />
+                        </View>
 
-            <View style={styles.statsTable}>
-                <View style={[styles.tableHeader, { borderBottomColor: theme.border }]}>
-                    <ThemedText variant="caption" color="textSecondary" style={styles.colBatter}>Batter</ThemedText>
-                    <ThemedText variant="caption" color="textSecondary" style={styles.colStatSmall}>R (B)</ThemedText>
-                    <ThemedText variant="caption" color="textSecondary" style={styles.colStatSmall}>4s</ThemedText>
-                    <ThemedText variant="caption" color="textSecondary" style={styles.colStatSmall}>6s</ThemedText>
-                    <ThemedText variant="caption" color="textSecondary" style={styles.colStatSmall}>SR</ThemedText>
-                </View>
-                <View style={[styles.tableRow, { borderBottomColor: theme.border }]}>
-                    <ThemedText weight="bold" style={styles.colBatter} color="primary">Tony de Zorzi</ThemedText>
-                    <ThemedText style={styles.colStatSmall}>47 (35)</ThemedText>
-                    <ThemedText style={styles.colStatSmall}>5</ThemedText>
-                    <ThemedText style={styles.colStatSmall}>2</ThemedText>
-                    <ThemedText style={styles.colStatSmall}>134.3</ThemedText>
-                    <Ionicons name="chevron-down" size={14} color={theme.textLight} />
-                </View>
-                <View style={[styles.tableRow, { borderBottomColor: theme.border }]}>
-                    <View style={[styles.colBatter, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
-                        <ThemedText weight="bold" color="primary">D Bedingham</ThemedText>
-                        <Ionicons name="flashlight" size={12} color="#facc15" />
-                    </View>
-                    <ThemedText style={styles.colStatSmall}>15 (11)</ThemedText>
-                    <ThemedText style={styles.colStatSmall}>3</ThemedText>
-                    <ThemedText style={styles.colStatSmall}>0</ThemedText>
-                    <ThemedText style={styles.colStatSmall}>136.4</ThemedText>
-                    <Ionicons name="chevron-down" size={14} color={theme.textLight} />
-                </View>
-            </View>
+                        <View style={{ flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md }}>
+                            <View style={{ flex: 1 }}>
+                                <ThemedText variant="small" color="textSecondary" style={{ marginBottom: 4 }}>Amount (₹)</ThemedText>
+                                <TextInput
+                                    style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
+                                    placeholder="e.g. 5000"
+                                    placeholderTextColor={theme.textLight}
+                                    keyboardType="numeric"
+                                    value={newAmount}
+                                    onChangeText={setNewAmount}
+                                />
+                            </View>
 
-            <View style={[styles.partnershipStrip, { backgroundColor: isDark ? theme.surface : theme.borderLight }]}>
-                <ThemedText color="textSecondary" variant="small">{`P'ship: 46 (30) >`}</ThemedText>
-                <ThemedText color="textSecondary" variant="small">Last wkt: V Kitime 10 (13)</ThemedText>
-            </View>
+                            <View style={{ flex: 1 }}>
+                                <ThemedText variant="small" color="textSecondary" style={{ marginBottom: 4 }}>Rate / Odds</ThemedText>
+                                <TextInput
+                                    style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
+                                    placeholder="e.g. 1.85 or 55"
+                                    placeholderTextColor={theme.textLight}
+                                    keyboardType="numeric"
+                                    value={newRate}
+                                    onChangeText={setNewRate}
+                                />
+                            </View>
+                        </View>
 
-            {/* Bowling Stats Table */}
-            <View style={styles.statsTable}>
-                <View style={[styles.tableHeader, { borderBottomColor: theme.border }]}>
-                    <ThemedText variant="caption" color="textSecondary" style={styles.colBatter}>Bowler</ThemedText>
-                    <ThemedText variant="caption" color="textSecondary" style={styles.colStatSmall}>W-R</ThemedText>
-                    <ThemedText variant="caption" color="textSecondary" style={styles.colStatSmall}>Overs</ThemedText>
-                    <ThemedText variant="caption" color="textSecondary" style={styles.colStatSmall}>Econ</ThemedText>
-                </View>
-                <View style={[styles.tableRow, { borderBottomColor: theme.border }]}>
-                    <ThemedText weight="bold" style={styles.colBatter}>L Sipamla</ThemedText>
-                    <ThemedText style={styles.colStatSmall}>0-22</ThemedText>
-                    <ThemedText style={styles.colStatSmall}>1.5</ThemedText>
-                    <ThemedText style={styles.colStatSmall}>12.00</ThemedText>
-                    <Ionicons name="chevron-down" size={14} color={theme.textLight} />
-                </View>
-            </View>
+                        <View style={{ marginBottom: spacing.lg }}>
+                            <ThemedText variant="small" color="textSecondary" style={{ marginBottom: 4 }}>Bet Category</ThemedText>
+                            <TouchableOpacity
+                                style={[styles.input, { backgroundColor: theme.background, borderColor: theme.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+                                onPress={() => setIsCategorySelectorVisible(!isCategorySelectorVisible)}
+                            >
+                                <ThemedText>{newCategory}</ThemedText>
+                                <Ionicons name={isCategorySelectorVisible ? "chevron-up" : "chevron-down"} size={20} color={theme.textLight} />
+                            </TouchableOpacity>
 
-            <View style={[styles.predictionSection, { backgroundColor: isDark ? theme.surface : theme.borderLight }]}>
-                <View style={styles.predictionHeaderRow}>
-                    <ThemedText weight="bold">Who will win?</ThemedText>
-                    <ThemedText color="textSecondary" variant="caption">Total Votes: 36,179</ThemedText>
-                </View>
-                <View style={styles.predictionButtonsRow}>
-                    <TouchableOpacity style={[styles.predButton, { backgroundColor: theme.background, borderColor: theme.border }]}><ThemedText weight="bold">WP</ThemedText></TouchableOpacity>
-                    <TouchableOpacity style={[styles.predButton, { backgroundColor: theme.background, borderColor: theme.border }]}><ThemedText weight="bold">LIO</ThemedText></TouchableOpacity>
-                </View>
-            </View>
+                            {isCategorySelectorVisible && (
+                                <View style={[styles.dropdownMenu, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                                    {BET_CATEGORIES.map((cat, index) => (
+                                        <TouchableOpacity
+                                            key={cat}
+                                            style={[styles.dropdownItem, index < BET_CATEGORIES.length - 1 && { borderBottomColor: theme.border, borderBottomWidth: 1 }]}
+                                            onPress={() => {
+                                                setNewCategory(cat);
+                                                setIsCategorySelectorVisible(false);
+                                            }}
+                                        >
+                                            <ThemedText color={newCategory === cat ? 'primary' : 'text'}>{cat}</ThemedText>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
+                        </View>
 
-            {/* Projected Score Table */}
-            <View style={[styles.projectedSection, { backgroundColor: isDark ? theme.surface : theme.borderLight, borderTopColor: theme.border, borderTopWidth: 1 }]}>
-                <ThemedText color="textSecondary" variant="caption" weight="bold" style={{ marginBottom: spacing.md }}>PROJECTED SCORE</ThemedText>
-                <View style={styles.projTable}>
-                    <View style={styles.projRow}>
-                        <ThemedText variant="caption" color="textSecondary" style={styles.projColHeader}>Run Rate</ThemedText>
-                        <ThemedText variant="caption" color="textSecondary" style={styles.projColValue}>20 overs</ThemedText>
-                        <ThemedText variant="caption" color="textSecondary" style={styles.projColValue}>50 overs</ThemedText>
-                    </View>
-                    <View style={styles.projRow}>
-                        <ThemedText color="primary" weight="bold" style={styles.projColHeader}>6.91*</ThemedText>
-                        <ThemedText weight="bold" style={styles.projColValue}>138</ThemedText>
-                        <ThemedText weight="bold" style={styles.projColValue}>345</ThemedText>
-                    </View>
-                    <View style={styles.projRow}>
-                        <ThemedText color="textSecondary" style={styles.projColHeader}>7.0</ThemedText>
-                        <ThemedText color="textSecondary" style={styles.projColValue}>140</ThemedText>
-                        <ThemedText color="textSecondary" style={styles.projColValue}>350</ThemedText>
-                    </View>
-                    <View style={[styles.projRow, { borderBottomWidth: 0 }]}>
-                        <ThemedText color="textSecondary" style={styles.projColHeader}>8.0</ThemedText>
-                        <ThemedText color="textSecondary" style={styles.projColValue}>160</ThemedText>
-                        <ThemedText color="textSecondary" style={styles.projColValue}>400</ThemedText>
-                    </View>
-                </View>
+                        {(newCategory === 'Session' || newCategory === 'Fancy') && (
+                            <View style={{ marginBottom: spacing.lg }}>
+                                <ThemedText variant="small" color="textSecondary" style={{ marginBottom: 8 }}>Session Choice</ThemedText>
+                                <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.typeButton,
+                                            { backgroundColor: newSessionChoice === 'Yes' ? theme.primaryLight : theme.background, borderColor: newSessionChoice === 'Yes' ? theme.primary : theme.border }
+                                        ]}
+                                        onPress={() => setNewSessionChoice('Yes')}
+                                    >
+                                        <ThemedText variant="small" weight="bold" color={newSessionChoice === 'Yes' ? 'primary' : 'textSecondary'}>Yes (Lagai)</ThemedText>
+                                    </TouchableOpacity>
 
-                <View style={styles.notificationStrip}>
-                    <View style={[styles.notificationInner, { backgroundColor: theme.primary + '15', marginTop: spacing.md }]}>
-                        <Ionicons name="notifications-outline" size={18} color={theme.primary} />
-                        <ThemedText color="text" variant="small" style={{ flex: 1 }}>Turn on Updates for Match</ThemedText>
-                        <TouchableOpacity><ThemedText color="primary" weight="bold" variant="small">Turn On</ThemedText></TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.typeButton,
+                                            { backgroundColor: newSessionChoice === 'No' ? '#FF3B3015' : theme.background, borderColor: newSessionChoice === 'No' ? '#FF3B30' : theme.border }
+                                        ]}
+                                        onPress={() => setNewSessionChoice('No')}
+                                    >
+                                        <ThemedText variant="small" weight="bold" color={newSessionChoice === 'No' ? 'error' : 'textSecondary'}>No (Khai)</ThemedText>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        )}
+
+                        <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xl }}>
+                            <TouchableOpacity
+                                style={[
+                                    styles.typeButton,
+                                    { backgroundColor: newType === 'pending' ? theme.primaryLight : theme.background, borderColor: newType === 'pending' ? theme.primary : theme.border }
+                                ]}
+                                onPress={() => setNewType('pending')}
+                            >
+                                <ThemedText variant="small" weight="bold" color={newType === 'pending' ? 'primary' : 'textSecondary'}>Pending</ThemedText>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[
+                                    styles.typeButton,
+                                    { backgroundColor: newType === 'plus' ? '#22c55e' : theme.background, borderColor: newType === 'plus' ? '#22c55e' : theme.border }
+                                ]}
+                                onPress={() => setNewType('plus')}
+                            >
+                                <ThemedText variant="small" weight="bold" color={newType === 'plus' ? 'white' : 'textSecondary'}>Plus (+)</ThemedText>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[
+                                    styles.typeButton,
+                                    { backgroundColor: newType === 'minus' ? '#ef4444' : theme.background, borderColor: newType === 'minus' ? '#ef4444' : theme.border }
+                                ]}
+                                onPress={() => setNewType('minus')}
+                            >
+                                <ThemedText variant="small" weight="bold" color={newType === 'minus' ? 'white' : 'textSecondary'}>Minus (-)</ThemedText>
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={{ flexDirection: 'row', gap: spacing.md, justifyContent: 'flex-end' }}>
+                            <TouchableOpacity style={{ padding: spacing.sm }} onPress={() => setIsAddEntryVisible(false)}>
+                                <ThemedText color="textSecondary" weight="bold">Cancel</ThemedText>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.saveButton, { backgroundColor: theme.primary }]} onPress={handleAddEntry}>
+                                <ThemedText color="white" weight="bold">Save Entry</ThemedText>
+                            </TouchableOpacity>
+                        </View>
                     </View>
-                </View>
-            </View>
-        </ScrollView>
+                </KeyboardAvoidingView>
+            </Modal>
+        </View>
     );
 };
 
@@ -733,7 +926,7 @@ const PointsTableTab = () => {
 
 export const MatchDetailScreen: React.FC = () => {
     const { theme, isDark } = useTheme();
-    const navigation = useNavigation<any>();
+    const navigation = useNavigation<MatchDetailNavigationProp>();
     const route = useRoute<RouteProp<RootStackParamList, 'MatchDetails'>>();
     const { matchId } = route.params;
 
@@ -765,7 +958,7 @@ export const MatchDetailScreen: React.FC = () => {
     }, []);
 
     const renderBackdrop = useCallback(
-        (props: any) => <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} />,
+        (props: BottomSheetBackdropProps) => <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} />,
         []
     );
 
@@ -778,7 +971,7 @@ export const MatchDetailScreen: React.FC = () => {
     const squad = selectedTeam ? SQUAD_DATA[selectedTeam] : [];
 
     const groupedSquad = useMemo(() => {
-        const groups: { [key: string]: any[] } = {
+        const groups: { [key: string]: { name: string; role: string }[] } = {
             'Batters': [],
             'Wicket-keepers': [],
             'All-rounders': [],
@@ -870,7 +1063,9 @@ export const MatchDetailScreen: React.FC = () => {
                 <Tab.Screen name="Info">
                     {() => <InfoTab onTeamPress={handleTeamPress} />}
                 </Tab.Screen>
-                <Tab.Screen name="Live" component={LiveTab} />
+                <Tab.Screen name="Live">
+                    {() => <LiveTab navigation={navigation} matchId={matchId} />}
+                </Tab.Screen>
                 <Tab.Screen name="Fantasy">
                     {() => <FantasyTab onViewAll={handleFantasyViewAll} onAnalysis={handleAnalysisPress} />}
                 </Tab.Screen>
@@ -1021,6 +1216,9 @@ const styles = StyleSheet.create({
     },
     headerIcon: {
         padding: spacing.xs,
+    },
+    tabContentContainer: { // New style for LiveTab wrapper
+        flex: 1,
     },
     tabContent: {
         flex: 1,
@@ -1559,6 +1757,66 @@ const styles = StyleSheet.create({
     colCupRCompact: {
         width: 40,
         alignItems: 'center',
+    },
+    fab: {
+        position: 'absolute',
+        bottom: spacing.lg,
+        right: spacing.lg,
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalBg: {
+        ...StyleSheet.absoluteFillObject,
+    },
+    dialogCard: {
+        width: '85%',
+        borderRadius: 16,
+        padding: spacing.lg,
+        ...elevation.lg,
+    },
+    input: {
+        borderWidth: 1,
+        borderRadius: 8,
+        padding: 12,
+        fontSize: 16,
+    },
+    dropdownMenu: {
+        borderWidth: 1,
+        borderTopWidth: 0,
+        borderBottomLeftRadius: 8,
+        borderBottomRightRadius: 8,
+        marginTop: -4,
+        ...elevation.sm,
+    },
+    dropdownItem: {
+        padding: 12,
+    },
+    typeButton: {
+        flex: 1,
+        paddingVertical: 10,
+        paddingHorizontal: 4,
+        alignItems: 'center',
+        borderRadius: 8,
+        borderWidth: 1,
+    },
+    saveButton: {
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.sm,
+        borderRadius: 8,
     },
 });
 
