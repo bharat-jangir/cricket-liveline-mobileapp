@@ -183,6 +183,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
+    flex: 1,
+    marginRight: spacing.md,
   },
   seriesText: {
     fontSize: fontSize.xs,
@@ -191,6 +193,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
+    flexShrink: 0,
   },
   formatBadge: {
     paddingHorizontal: spacing.sm,

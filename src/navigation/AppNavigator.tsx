@@ -107,6 +107,7 @@ const MainTabNavigator = () => {
           fontSize: fontSize.xs,
           fontWeight: '600',
         },
+        tabBarAllowFontScaling: false,
         headerShown: false,
       })}
     >

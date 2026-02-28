@@ -11,6 +11,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../theme/ThemeContext';
 import { Text as ThemedText } from '../components/ui/Text';
 import { spacing } from '../theme';
@@ -26,6 +29,7 @@ interface Short {
   comments: number;
   shares: number;
   views: string;
+  playerId: string;
 }
 
 const MOCK_SHORTS: Short[] = [
@@ -38,6 +42,7 @@ const MOCK_SHORTS: Short[] = [
     comments: 340,
     shares: 89,
     views: '1.2M',
+    playerId: '1',
   },
   {
     id: '2',
@@ -48,6 +53,7 @@ const MOCK_SHORTS: Short[] = [
     comments: 210,
     shares: 45,
     views: '890K',
+    playerId: '2',
   },
   {
     id: '3',
@@ -58,6 +64,7 @@ const MOCK_SHORTS: Short[] = [
     comments: 450,
     shares: 120,
     views: '1.5M',
+    playerId: '3',
   },
   {
     id: '4',
@@ -68,11 +75,13 @@ const MOCK_SHORTS: Short[] = [
     comments: 680,
     shares: 200,
     views: '2.1M',
+    playerId: '1',
   },
 ];
 
 export const ShortsScreen: React.FC = () => {
   const { theme } = useTheme();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const tabBarHeight = useBottomTabBarHeight();
   const shortHeight = SCREEN_HEIGHT - tabBarHeight;
 
@@ -136,9 +145,15 @@ export const ShortsScreen: React.FC = () => {
           style={styles.bottomGradient}
         >
           <View style={styles.bottomInfo}>
-            <ThemedText variant="body" color="white" weight="semibold">
-              {item.title}
-            </ThemedText>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate('PlayerProfile', { playerId: item.playerId })}
+              style={styles.playerLink}
+            >
+              <ThemedText variant="body" color="white" weight="bold" style={styles.playerTitle}>
+                @{item.title.split(' ')[0]} {/* Simplified player name for display */}
+              </ThemedText>
+            </TouchableOpacity>
             <ThemedText variant="small" color="white" style={styles.description}>
               {item.description}
             </ThemedText>
@@ -259,5 +274,15 @@ const styles = StyleSheet.create({
   actionButton: {
     alignItems: 'center',
     gap: spacing.xs,
+  },
+  playerLink: {
+    marginBottom: spacing.xs,
+    alignSelf: 'flex-start',
+  },
+  playerTitle: {
+    fontSize: 16,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: -1, height: 1 },
+    textShadowRadius: 10,
   },
 });

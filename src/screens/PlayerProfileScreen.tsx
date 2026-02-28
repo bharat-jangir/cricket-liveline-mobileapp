@@ -10,7 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/ThemeContext';
 import { spacing, borderRadius, fontSize } from '../theme';
 import { Text as ThemedText } from '../components/ui/Text';
-import { mockPlayers, Player, PlayerStats, completedMatches } from '../data/mockData';
+import { mockPlayers, Player, PlayerStats, completedMatches, Match } from '../data/mockData';
 import { PlayerProvider, usePlayerContext } from '../contexts/PlayerContext';
 import { MatchCard } from '../components/MatchCard';
 import { Text } from 'react-native-gesture-handler';
@@ -105,16 +105,53 @@ const OverviewTab = ({ player }: { player: Player }) => {
     );
 };
 
+const SeriesAccordion = ({ series, matches }: { series: string, matches: Match[] }) => {
+    const { theme } = useTheme();
+    const [expanded, setExpanded] = useState(false);
+
+    return (
+        <View style={[styles.accordionContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <TouchableOpacity
+                style={styles.accordionHeader}
+                onPress={() => setExpanded(!expanded)}
+                activeOpacity={0.7}
+            >
+                <ThemedText variant="subtitle" weight="bold">{series}</ThemedText>
+                <Ionicons
+                    name={expanded ? "chevron-up" : "chevron-down"}
+                    size={20}
+                    color={theme.textSecondary}
+                />
+            </TouchableOpacity>
+
+            {expanded && (
+                <View style={styles.accordionBody}>
+                    {matches.map(match => (
+                        <MatchCard key={match.id} match={match} />
+                    ))}
+                </View>
+            )}
+        </View>
+    );
+};
+
 const MatchesTab = () => {
     const { theme } = useTheme();
-    // Defaulting to top 3 completed Matches for demo
-    const matches = completedMatches.slice(0, 3);
+
+    // Group completed matches by series
+    const groupedMatches = completedMatches.reduce((acc, match) => {
+        if (!acc[match.series]) {
+            acc[match.series] = [];
+        }
+        acc[match.series].push(match);
+        return acc;
+    }, {} as Record<string, Match[]>);
 
     return (
         <ScrollView style={{ flex: 1, backgroundColor: theme.background }} contentContainerStyle={styles.tabContent}>
             <View style={{ gap: spacing.md }}>
-                {matches.map(match => (
-                    <MatchCard key={match.id} match={match} />
+                {Object.entries(groupedMatches).map(([series, matches]) => (
+                    <SeriesAccordion key={series} series={series} matches={matches} />
                 ))}
             </View>
         </ScrollView>
@@ -130,6 +167,7 @@ const genericNews = [
 
 const NewsTab = () => {
     const { theme } = useTheme();
+    const navigation = useNavigation<any>();
     return (
         <ScrollView style={{ flex: 1, backgroundColor: theme.background }} contentContainerStyle={styles.tabContent}>
             <View style={{ gap: spacing.md }}>
@@ -138,6 +176,7 @@ const NewsTab = () => {
                         key={news.id}
                         style={[styles.newsCard, { backgroundColor: theme.card }]}
                         activeOpacity={0.8}
+                        onPress={() => navigation.navigate('NewsDetail', { newsId: news.id })}
                     >
                         <Image source={{ uri: news.image }} style={styles.newsImage} />
                         <LinearGradient
@@ -245,6 +284,7 @@ const PlayerProfileContent = ({ player }: { player: Player }) => {
                     tabBarActiveTintColor: theme.primary,
                     tabBarInactiveTintColor: theme.textSecondary,
                     tabBarLabelStyle: { textTransform: 'none', fontWeight: 'bold', fontSize: 13 },
+                    tabBarAllowFontScaling: false,
                     tabBarScrollEnabled: true,
                     tabBarItemStyle: { width: width / 3.5 },
                 }}
@@ -277,7 +317,7 @@ const PlayerProfileContent = ({ player }: { player: Player }) => {
                         activeOpacity={0.8}
                         onPress={() => statMode !== 'Batting' && toggleStatMode()}
                     >
-                        <Text>bat</Text>
+                        <ThemedText weight="bold" color={statMode === 'Batting' ? 'white' : 'textSecondary'} style={{ fontSize: 12, textTransform: 'uppercase' }}>bat</ThemedText>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -525,5 +565,22 @@ const styles = StyleSheet.create({
     newsTitle: {
         marginBottom: spacing.xs,
         lineHeight: 22,
+    },
+    accordionContainer: {
+        borderRadius: borderRadius.lg,
+        borderWidth: 1,
+        overflow: 'hidden',
+        marginBottom: spacing.sm,
+    },
+    accordionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: spacing.md,
+    },
+    accordionBody: {
+        padding: spacing.md,
+        paddingTop: 0,
+        gap: spacing.md,
     }
 });

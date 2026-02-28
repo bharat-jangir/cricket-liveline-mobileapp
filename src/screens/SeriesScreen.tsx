@@ -127,6 +127,7 @@ export const SeriesScreen: React.FC = () => {
           tabBarIndicatorStyle: { backgroundColor: theme.primary },
           tabBarStyle: { backgroundColor: theme.surface },
           tabBarLabelStyle: { fontWeight: 'bold', textTransform: 'capitalize', },
+          tabBarAllowFontScaling: false,
           tabBarScrollEnabled: true,
           lazy: true,
         }}

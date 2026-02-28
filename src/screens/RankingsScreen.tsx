@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, FlatList } from 'react-native';
+import { View, TouchableOpacity, ScrollView, StyleSheet, FlatList } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -72,7 +72,7 @@ export const RankingsScreen: React.FC = () => {
       <View style={styles.rankingContent}>
         <View style={styles.rankInfo}>
           <View style={[styles.rankBadge, { backgroundColor: theme.primary + '15' }]}>
-            <Text style={[styles.rankNumber, { color: theme.primary }]}>#{item.rank}</Text>
+            <ThemedText style={[styles.rankNumber, { color: theme.primary }]}>#{item.rank}</ThemedText>
           </View>
           <View style={styles.playerInfo}>
             <ThemedText variant="body" weight="semibold">{item.name}</ThemedText>
@@ -94,18 +94,18 @@ export const RankingsScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-        {/* Header */}
-        <LinearGradient colors={['#1877f2', '#42a5f5']} style={styles.header}>
-          <View style={styles.headerContent}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color="white" />
-            </TouchableOpacity>
-            <ThemedText variant="body" weight="bold" style={styles.headerTitle}>
-              ICC Rankings
-            </ThemedText>
-            <View style={{ width: 40 }} />
-          </View>
-        </LinearGradient>
+      {/* Header */}
+      <LinearGradient colors={['#1877f2', '#42a5f5']} style={styles.header}>
+        <View style={styles.headerContent}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="white" />
+          </TouchableOpacity>
+          <ThemedText variant="body" weight="bold" style={styles.headerTitle}>
+            ICC Rankings
+          </ThemedText>
+          <View style={{ width: 40 }} />
+        </View>
+      </LinearGradient>
 
       {/* Main Tabs (Gender & Format) */}
       <View style={{ backgroundColor: theme.surface }}>
@@ -116,9 +116,9 @@ export const RankingsScreen: React.FC = () => {
               style={[styles.tab, gender === g && { borderBottomColor: theme.primary, borderBottomWidth: 3 }]}
               onPress={() => setGender(g)}
             >
-              <Text style={[styles.tabText, { color: gender === g ? theme.primary : theme.textSecondary }]}>
+              <ThemedText style={[styles.tabText, { color: gender === g ? theme.primary : theme.textSecondary }]}>
                 {g === 'mens' ? "Men's" : "Women's"}
-              </Text>
+              </ThemedText>
             </TouchableOpacity>
           ))}
         </View>
@@ -130,9 +130,9 @@ export const RankingsScreen: React.FC = () => {
               style={[styles.tab, format === f && { borderBottomColor: theme.primary, borderBottomWidth: 3 }]}
               onPress={() => setFormat(f)}
             >
-              <Text style={[styles.tabText, { color: format === f ? theme.primary : theme.textSecondary }]}>
+              <ThemedText style={[styles.tabText, { color: format === f ? theme.primary : theme.textSecondary }]}>
                 {f.toUpperCase()}
-              </Text>
+              </ThemedText>
             </TouchableOpacity>
           ))}
         </View>
@@ -140,8 +140,8 @@ export const RankingsScreen: React.FC = () => {
 
       {/* Category Pills - Scrollable */}
       <View style={{ backgroundColor: theme.surface, borderBottomWidth: 1, borderBottomColor: theme.border }}>
-        <ScrollView 
-          horizontal 
+        <ScrollView
+          horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categoryContainer}
         >
@@ -155,19 +155,19 @@ export const RankingsScreen: React.FC = () => {
               key={cat.id}
               activeOpacity={0.7}
               style={[
-                styles.categoryTab, 
+                styles.categoryTab,
                 category === cat.id ? { backgroundColor: theme.primary } : { backgroundColor: theme.background }
               ]}
               onPress={() => setCategory(cat.id as Category)}
             >
-              <Ionicons 
-                name={cat.icon as any} 
-                size={16} 
-                color={category === cat.id ? 'white' : theme.text} 
+              <Ionicons
+                name={cat.icon as any}
+                size={16}
+                color={category === cat.id ? 'white' : theme.text}
               />
-              <Text style={[styles.categoryText, { color: category === cat.id ? 'white' : theme.text }]}>
+              <ThemedText style={[styles.categoryText, { color: category === cat.id ? 'white' : theme.text }]}>
                 {cat.label}
-              </Text>
+              </ThemedText>
             </TouchableOpacity>
           ))}
         </ScrollView>

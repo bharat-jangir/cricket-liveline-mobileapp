@@ -637,6 +637,7 @@ export const SeriesDetailScreen: React.FC = () => {
           tabBarIndicatorStyle: { backgroundColor: theme.primary, height: 3 },
           tabBarStyle: { backgroundColor: theme.surface, elevation: 2 },
           tabBarLabelStyle: { fontWeight: 'bold', textTransform: 'capitalize' },
+          tabBarAllowFontScaling: false,
           tabBarScrollEnabled: true,
           lazy: true,
         }}

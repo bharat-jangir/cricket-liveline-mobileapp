@@ -1,7 +1,6 @@
 import React, { useRef, useEffect, useState } from "react";
 import {
   View,
-  Text,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
@@ -118,7 +117,7 @@ export const HomeScreen: React.FC = () => {
   const HEADER_HEIGHT = spacing.lg + spacing.sm + 40;
   const NEWS_HEIGHT = 300;
   const INITIAL_SHEET_TOP = NEWS_HEIGHT;
-  const EXPANDED_SHEET_TOP = HEADER_HEIGHT+2;
+  const EXPANDED_SHEET_TOP = HEADER_HEIGHT + 2;
   const translateY = useRef(new Animated.Value(INITIAL_SHEET_TOP)).current;
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -160,77 +159,86 @@ export const HomeScreen: React.FC = () => {
   }, []);
 
   const renderNewsItem = ({ item }: { item: (typeof topNews)[0] }) => (
-    <View style={styles.newsItem}>
+    <TouchableOpacity
+      activeOpacity={0.9}
+      onPress={() => navigation.navigate('NewsDetail', { newsId: item.id })}
+      style={styles.newsItem}
+    >
       <LinearGradient
         colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.7)']}
         style={styles.newsGradient}
       >
         <View style={styles.newsImageContainer}>
-          <Text style={styles.newsEmoji}>{item.image}</Text>
+          <ThemedText style={styles.newsEmoji}>{item.image}</ThemedText>
         </View>
         <View style={styles.newsTextContainer}>
-          <Text style={styles.newsTitle}>{item.title}</Text>
-          <Text style={styles.newsSummary}>{item.summary}</Text>
+          <ThemedText style={styles.newsTitle}>{item.title}</ThemedText>
+          <ThemedText style={styles.newsSummary}>{item.summary}</ThemedText>
         </View>
       </LinearGradient>
-    </View>
+    </TouchableOpacity>
   );
 
   const renderLiveMatch = ({ item }: { item: (typeof liveMatchesData)[0] }) => (
     <Card style={styles.liveMatchCard}>
       <View style={styles.cardHeader}>
-        <Text style={[styles.matchTitleText, { color: theme.textSecondary }]}>
+        <ThemedText style={[styles.matchTitleText, { color: theme.textSecondary }]}>
           {item.team1} vs {item.team2}
-        </Text>
+        </ThemedText>
         <View style={styles.liveIndicator}>
           <View style={styles.liveDot} />
-          <Text style={styles.liveText}>LIVE</Text>
+          <ThemedText style={styles.liveText}>LIVE</ThemedText>
         </View>
       </View>
       <View style={styles.matchInfo}>
-        <Text style={[styles.teamScore, { color: theme.text }]}>
+        <ThemedText style={[styles.teamScore, { color: theme.text }]}>
           {item.team1} ({item.score1})
-        </Text>
-        <Text style={[styles.teamScore, { color: theme.text }]}>
+        </ThemedText>
+        <ThemedText style={[styles.teamScore, { color: theme.text }]}>
           {item.team2} ({item.score2})
-        </Text>
+        </ThemedText>
       </View>
     </Card>
   );
 
   const renderNewsCard = ({ item }: { item: (typeof newsCards)[0] }) => (
-    <Card style={styles.newsCard}>
-      <View style={styles.newsCardImageContainer}>
-        <View style={styles.newsCardImage}>
-          <Text style={styles.newsCardEmoji}>📰</Text>
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={() => navigation.navigate('NewsDetail', { newsId: item.id })}
+    >
+      <Card style={styles.newsCard}>
+        <View style={styles.newsCardImageContainer}>
+          <View style={styles.newsCardImage}>
+            <ThemedText style={styles.newsCardEmoji}>📰</ThemedText>
+          </View>
         </View>
-      </View>
-      <View style={styles.newsCardContent}>
-        <View
-          style={[
-            styles.categoryBadge,
-            { backgroundColor: theme.primary + "20" },
-          ]}
-        >
-          <Text style={[styles.categoryText, { color: theme.primary }]}>
-            {item.category}
-          </Text>
+        <View style={styles.newsCardContent}>
+          <View
+            style={[
+              styles.categoryBadge,
+              { backgroundColor: theme.primary + "20" },
+            ]}
+          >
+            <ThemedText style={[styles.categoryText, { color: theme.primary }]}>
+              {item.category}
+            </ThemedText>
+          </View>
+          <ThemedText variant="body" weight="semibold" style={styles.newsCardTitle}>
+            {item.title}
+          </ThemedText>
+          <ThemedText color="textSecondary" variant="small">
+            {item.time}
+          </ThemedText>
         </View>
-        <ThemedText variant="body" weight="semibold" style={styles.newsCardTitle}>
-          {item.title}
-        </ThemedText>
-        <ThemedText color="textSecondary" variant="small">
-          {item.time}
-        </ThemedText>
-      </View>
-    </Card>
+      </Card>
+    </TouchableOpacity>
   );
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Header */}
-      <LinearGradient 
-        colors={isExpanded ? ["#1877f2", "#42a5f5"] : ["transparent", "transparent"]} 
+      <LinearGradient
+        colors={isExpanded ? ["#1877f2", "#42a5f5"] : ["transparent", "transparent"]}
         style={[styles.header, { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20 }]}
       >
         <View style={styles.headerContent}>
@@ -243,18 +251,18 @@ export const HomeScreen: React.FC = () => {
               />
             </View>
             <View>
-              <Text style={styles.appTitle}>Cricket Pulse</Text>
-              <Text style={styles.appSubtitle}>Live Cricket Scores</Text>
+              <ThemedText style={styles.appTitle}>Cricket Pulse</ThemedText>
+              <ThemedText style={styles.appSubtitle}>Live Cricket Scores</ThemedText>
             </View>
           </View>
           <View style={styles.headerRight}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.headerButton}
               onPress={() => navigation.navigate('GlobalSearch')}
             >
               <Ionicons name="search" size={20} color="white" />
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.headerButton}
               onPress={() => navigation.navigate('ProfileMenu')}
             >
@@ -320,19 +328,19 @@ export const HomeScreen: React.FC = () => {
         <View style={[styles.breadcrumbNav, { backgroundColor: theme.surface }]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.breadcrumbContainer}>
             <TouchableOpacity onPress={() => navigation.navigate('Main', { screen: 'Matches' })}>
-              <Text style={[styles.breadcrumbText, { color: theme.text, backgroundColor: theme.primary + '15' }]}>Matches <Ionicons name="chevron-forward" size={14} color={theme.text} /></Text>
+              <ThemedText style={[styles.breadcrumbText, { color: theme.text, backgroundColor: theme.primary + '15' }]}>Matches <Ionicons name="chevron-forward" size={14} color={theme.text} /></ThemedText>
             </TouchableOpacity>
-            
+
             <TouchableOpacity onPress={() => navigation.navigate('Main', { screen: 'Fixtures' })}>
-              <Text style={[styles.breadcrumbText, { color: theme.text, backgroundColor: theme.primary + '15' }]}>Fixtures <Ionicons name="chevron-forward" size={14} color={theme.text} /></Text>
+              <ThemedText style={[styles.breadcrumbText, { color: theme.text, backgroundColor: theme.primary + '15' }]}>Fixtures <Ionicons name="chevron-forward" size={14} color={theme.text} /></ThemedText>
             </TouchableOpacity>
-            
+
             <TouchableOpacity onPress={() => navigation.navigate('Rankings')}>
-              <Text style={[styles.breadcrumbText, { color: theme.text, backgroundColor: theme.primary + '15' }]}>Rankings <Ionicons name="chevron-forward" size={14} color={theme.text} /></Text>
+              <ThemedText style={[styles.breadcrumbText, { color: theme.text, backgroundColor: theme.primary + '15' }]}>Rankings <Ionicons name="chevron-forward" size={14} color={theme.text} /></ThemedText>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => console.log('Market Book pressed')}>
-              <Text style={[styles.breadcrumbText, { color: theme.text, backgroundColor: theme.primary + '15' }]}>Market Book <Ionicons name="chevron-forward" size={14} color={theme.text} /></Text>
+              <ThemedText style={[styles.breadcrumbText, { color: theme.text, backgroundColor: theme.primary + '15' }]}>Market Book <Ionicons name="chevron-forward" size={14} color={theme.text} /></ThemedText>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -366,7 +374,7 @@ export const HomeScreen: React.FC = () => {
                 News
               </ThemedText>
               <TouchableOpacity onPress={() => navigation.navigate('AllNews')}>
-                <Text style={[styles.viewAllText, { color: theme.primary }]}>View All <Ionicons name="chevron-forward" size={14} color={theme.primary} /></Text>
+                <ThemedText style={[styles.viewAllText, { color: theme.primary }]}>View All <Ionicons name="chevron-forward" size={14} color={theme.primary} /></ThemedText>
               </TouchableOpacity>
             </View>
             {newsCards.map((item) => (
@@ -458,7 +466,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     // backgroundColor:"red",
-    width:SCREEN_WIDTH
+    width: SCREEN_WIDTH
 
   },
   newsEmoji: {
@@ -488,7 +496,7 @@ const styles = StyleSheet.create({
     top: '50%',
     right: 15,
     transform: [{ translateY: -40 }],
-    opacity:0.5
+    opacity: 0.5
   },
   indicator: {
     width: 8,

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
-import { View, StyleSheet, TouchableOpacity, SafeAreaView, Dimensions, Text, ScrollView, FlatList, Image } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, SafeAreaView, Dimensions, ScrollView, FlatList, Image } from 'react-native';
 import BottomSheet, { BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
@@ -117,7 +117,7 @@ const DistanceLabel = ({ distance, angle }: { distance: number, angle: number })
 
     return (
         <View style={{ position: 'absolute', transform: [{ translateX: x }, { translateY: y }] }}>
-            <Text style={{
+            <ThemedText style={{
                 fontSize: 11,
                 color: 'white',
                 fontWeight: 'bold',
@@ -131,7 +131,7 @@ const DistanceLabel = ({ distance, angle }: { distance: number, angle: number })
                 overflow: 'hidden'
             }}>
                 {distance}m
-            </Text>
+            </ThemedText>
         </View>
     );
 }
@@ -588,6 +588,7 @@ export const VenueDetailScreen: React.FC = () => {
                     tabBarActiveTintColor: theme.primary,
                     tabBarInactiveTintColor: theme.textSecondary,
                     tabBarLabelStyle: { textTransform: 'none', fontWeight: 'bold', fontSize: 13 },
+                    tabBarAllowFontScaling: false,
                     tabBarScrollEnabled: true,
                     tabBarItemStyle: { width: width / 3.5 },
                 }}

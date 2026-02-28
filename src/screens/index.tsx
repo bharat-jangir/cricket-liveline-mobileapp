@@ -124,6 +124,7 @@ export const MatchesScreen: React.FC = () => {
           tabBarStyle: { backgroundColor: theme.surface },
           tabBarIndicatorStyle: { backgroundColor: theme.primary, height: 3 },
           tabBarLabelStyle: { fontWeight: 'bold', textTransform: 'capitalize' },
+          tabBarAllowFontScaling: false,
           tabBarActiveTintColor: theme.primary,
           tabBarInactiveTintColor: theme.textSecondary,
         }}
