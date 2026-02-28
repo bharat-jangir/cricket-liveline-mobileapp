@@ -5,7 +5,9 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
+    "icon": "./assets/no-bg-logo.png",
     "splash": {
+      "image": "./assets/no-bg-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#1e40af"
     },
@@ -17,10 +19,11 @@
     },
     "android": {
       "adaptiveIcon": {
+        "foregroundImage": "./assets/no-bg-logo.png",
         "backgroundColor": "#1e40af"
       },
       "statusBar": {
-        "translucent": false,
+        "translucent": true,
         "backgroundColor": "#1877f2"
       },
       "package": "com.anonymous.cricketpulse"
