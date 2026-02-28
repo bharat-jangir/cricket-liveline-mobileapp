@@ -7,7 +7,7 @@ import { Image } from 'react-native';
 import { useTheme } from '@/theme/ThemeContext';
 import { fontSize } from '@/theme';
 
-// Import screens
+// Import screens - Restored after accidental deletion
 import { SplashScreen } from '@/screens/SplashScreen';
 import { OnboardingScreen } from '@/screens/OnboardingScreen';
 import { LoginScreen } from '@/screens/LoginScreen';

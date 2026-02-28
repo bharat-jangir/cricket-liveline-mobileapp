@@ -74,16 +74,16 @@ const MOCK_NEWS: NewsArticle[] = [
 ];
 
 export const AllNewsScreen: React.FC = () => {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
   const renderNewsItem = ({ item }: { item: NewsArticle }) => (
     <TouchableOpacity
       onPress={() => navigation.navigate('NewsDetail', { newsId: item.id })}
     >
-      <Card style={styles.newsCard}>
+      <Card style={[styles.newsCard, { backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1 }]}>
         <View style={styles.imageContainer}>
-          <View style={[styles.imagePlaceholder, { backgroundColor: theme.primary }]}>
+          <View style={[styles.imagePlaceholder, { backgroundColor: isDark ? theme.border : theme.primary }]}>
             <Ionicons name="newspaper-outline" size={40} color="white" />
           </View>
           <View style={[styles.categoryBadge, { backgroundColor: theme.primary }]}>
@@ -120,7 +120,7 @@ export const AllNewsScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <LinearGradient colors={[theme.primary, '#42a5f5']} style={styles.header}>
+      <LinearGradient colors={isDark ? [theme.surface, theme.background] : [theme.primary, theme.primaryDark]} style={styles.header}>
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="white" />

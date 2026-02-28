@@ -13,13 +13,13 @@ import { Text as ThemedText } from '../components/ui/Text';
 import { spacing, borderRadius } from '../theme';
 
 export const NewsDetailScreen: React.FC = () => {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const navigation = useNavigation();
   const route = useRoute();
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <LinearGradient colors={[theme.primary, '#42a5f5']} style={styles.header}>
+      <LinearGradient colors={isDark ? [theme.surface, theme.background] : [theme.primary, theme.primaryDark]} style={styles.header}>
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="white" />
@@ -66,8 +66,8 @@ export const NewsDetailScreen: React.FC = () => {
           </View>
         </View>
 
-        <View style={[styles.imagePlaceholder, { backgroundColor: theme.primary + '20' }]}>
-          <Ionicons name="image-outline" size={60} color={theme.primary} />
+        <View style={[styles.imagePlaceholder, { backgroundColor: isDark ? theme.surface : theme.primary + '20' }]}>
+          <Ionicons name="image-outline" size={60} color={isDark ? theme.textSecondary : theme.primary} />
         </View>
 
         <View style={styles.articleContent}>
@@ -117,10 +117,10 @@ export const NewsDetailScreen: React.FC = () => {
           <ThemedText variant="title" weight="bold" style={styles.relatedTitle}>
             Related Articles
           </ThemedText>
-          
-          <TouchableOpacity style={[styles.relatedCard, { backgroundColor: theme.surface }]}>
-            <View style={[styles.relatedImage, { backgroundColor: theme.primary + '20' }]}>
-              <Ionicons name="newspaper-outline" size={24} color={theme.primary} />
+
+          <TouchableOpacity style={[styles.relatedCard, { backgroundColor: theme.surface, borderColor: theme.border, borderWidth: 1 }]}>
+            <View style={[styles.relatedImage, { backgroundColor: isDark ? theme.border : theme.primary + '20' }]}>
+              <Ionicons name="newspaper-outline" size={24} color={isDark ? theme.text : theme.primary} />
             </View>
             <View style={styles.relatedContent}>
               <ThemedText variant="small" weight="semibold" numberOfLines={2}>
@@ -132,9 +132,9 @@ export const NewsDetailScreen: React.FC = () => {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.relatedCard, { backgroundColor: theme.surface }]}>
-            <View style={[styles.relatedImage, { backgroundColor: theme.primary + '20' }]}>
-              <Ionicons name="newspaper-outline" size={24} color={theme.primary} />
+          <TouchableOpacity style={[styles.relatedCard, { backgroundColor: theme.surface, borderColor: theme.border, borderWidth: 1 }]}>
+            <View style={[styles.relatedImage, { backgroundColor: isDark ? theme.border : theme.primary + '20' }]}>
+              <Ionicons name="newspaper-outline" size={24} color={isDark ? theme.text : theme.primary} />
             </View>
             <View style={styles.relatedContent}>
               <ThemedText variant="small" weight="semibold" numberOfLines={2}>

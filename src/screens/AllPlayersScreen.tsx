@@ -15,7 +15,7 @@ type RoleFilter = 'All' | 'Batsman' | 'Bowler' | 'All-Rounder';
 const ROLES: RoleFilter[] = ['All', 'Batsman', 'Bowler', 'All-Rounder'];
 
 export const AllPlayersScreen: React.FC = () => {
-    const { theme } = useTheme();
+    const { theme, isDark } = useTheme();
     const navigation = useNavigation<NavigationProp>();
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -63,7 +63,7 @@ export const AllPlayersScreen: React.FC = () => {
             <View style={styles.cardHeader}>
                 <Image
                     source={{ uri: item.image }}
-                    style={styles.playerImage}
+                    style={[styles.playerImage, { backgroundColor: isDark ? theme.border : '#f0f0f0' }]}
                     resizeMode="cover"
                 />
                 <View style={styles.playerInfo}>
@@ -106,6 +106,7 @@ export const AllPlayersScreen: React.FC = () => {
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                         autoCorrect={false}
+                        allowFontScaling={false}
                     />
                     {searchQuery.length > 0 && (
                         <TouchableOpacity onPress={() => setSearchQuery('')}>
@@ -250,7 +251,6 @@ const styles = StyleSheet.create({
         width: 80,
         height: 80,
         borderRadius: 40,
-        backgroundColor: '#f0f0f0',
         marginBottom: spacing.sm,
     },
     playerInfo: {

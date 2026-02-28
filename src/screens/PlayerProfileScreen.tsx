@@ -13,7 +13,7 @@ import { Text as ThemedText } from '../components/ui/Text';
 import { mockPlayers, Player, PlayerStats, completedMatches, Match } from '../data/mockData';
 import { PlayerProvider, usePlayerContext } from '../contexts/PlayerContext';
 import { MatchCard } from '../components/MatchCard';
-import { Text } from 'react-native-gesture-handler';
+// import { Text } from 'react-native-gesture-handler'; // Removed incorrect import
 
 const TopTab = createMaterialTopTabNavigator();
 const { width } = Dimensions.get('window');
@@ -23,7 +23,7 @@ type StatFormat = 'test' | 'odi' | 't20i';
 // --- Tab Components ---
 
 const OverviewTab = ({ player }: { player: Player }) => {
-    const { theme } = useTheme();
+    const { theme, isDark } = useTheme();
     const { statMode } = usePlayerContext();
     const [activeFormat, setActiveFormat] = useState<StatFormat>('odi');
     const { width: windowWidth } = useWindowDimensions();
@@ -41,7 +41,7 @@ const OverviewTab = ({ player }: { player: Player }) => {
     const renderStatBox = (label: string, value?: string) => {
         if (!value) return null;
         return (
-            <View style={[styles.statBox, { width: boxWidth, backgroundColor: theme.card, shadowColor: theme.text, borderColor: 'rgba(150,150,150,0.1)' }]}>
+            <View style={[styles.statBox, { width: boxWidth, backgroundColor: theme.card, shadowColor: theme.shadow, borderColor: theme.border }]}>
                 <ThemedText variant="caption" color="textSecondary" weight="medium" style={{ letterSpacing: 0.5 }}>{label.toUpperCase()}</ThemedText>
                 <ThemedText variant="heading" weight="bold" style={styles.statValue}>{value}</ThemedText>
             </View>
@@ -136,7 +136,7 @@ const SeriesAccordion = ({ series, matches }: { series: string, matches: Match[]
 };
 
 const MatchesTab = () => {
-    const { theme } = useTheme();
+    const { theme, isDark } = useTheme();
 
     // Group completed matches by series
     const groupedMatches = completedMatches.reduce((acc, match) => {
@@ -166,7 +166,7 @@ const genericNews = [
 ];
 
 const NewsTab = () => {
-    const { theme } = useTheme();
+    const { theme, isDark } = useTheme();
     const navigation = useNavigation<any>();
     return (
         <ScrollView style={{ flex: 1, backgroundColor: theme.background }} contentContainerStyle={styles.tabContent}>
@@ -199,10 +199,10 @@ const NewsTab = () => {
 };
 
 const PlayerInfoTab = ({ player }: { player: Player }) => {
-    const { theme } = useTheme();
+    const { theme, isDark } = useTheme();
     return (
         <ScrollView style={{ flex: 1, backgroundColor: theme.background }} contentContainerStyle={styles.tabContent}>
-            <View style={[styles.card, { backgroundColor: theme.card, shadowColor: theme.text, borderColor: 'rgba(150,150,150,0.05)' }]}>
+            <View style={[styles.card, { backgroundColor: theme.card, shadowColor: theme.shadow, borderColor: theme.border }]}>
                 <ThemedText variant="subtitle" weight="bold" style={styles.sectionTitle}>
                     Personal Information
                 </ThemedText>
@@ -234,7 +234,7 @@ const PlayerInfoTab = ({ player }: { player: Player }) => {
 // --- Main Screen Container ---
 
 const PlayerProfileContent = ({ player }: { player: Player }) => {
-    const { theme } = useTheme();
+    const { theme, isDark } = useTheme();
     const navigation = useNavigation();
     const { statMode, toggleStatMode } = usePlayerContext();
 
@@ -301,7 +301,7 @@ const PlayerProfileContent = ({ player }: { player: Player }) => {
 
             {/* Centered Pill Action Switch (Bat/Bowl) */}
             <View style={styles.pillContainer}>
-                <View style={[styles.pillWrapper, { backgroundColor: theme.surface }]}>
+                <View style={[styles.pillWrapper, { backgroundColor: isDark ? theme.border : theme.surface }]}>
                     <Animated.View
                         style={[
                             styles.pillIndicator,
@@ -338,9 +338,9 @@ const PlayerProfileContent = ({ player }: { player: Player }) => {
 };
 
 export const PlayerProfileScreen: React.FC = () => {
+    const { theme, isDark } = useTheme();
     const route = useRoute<any>();
     const navigation = useNavigation();
-    const { theme } = useTheme();
 
     const { playerId } = route.params;
     const player = mockPlayers.find(p => p.id === playerId);

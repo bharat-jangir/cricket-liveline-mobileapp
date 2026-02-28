@@ -85,7 +85,7 @@ const generateMatches = (startDate: Date, count: number, direction: 'past' | 'fu
 };
 
 export const FixturesScreen: React.FC = () => {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const sectionListRef = useRef<SectionList>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -141,23 +141,19 @@ export const FixturesScreen: React.FC = () => {
 
   const jumpToDate = (date: Date) => {
     const dateStr = getLocalYMD(date);
-    const targetTitle = formatDateHeader(dateStr); // Use the formatter to get the actual section title
+    const targetTitle = formatDateHeader(dateStr);
 
-    // Find the section where either the title or the raw date matches
     const index = sections.findIndex(s => s.title === targetTitle || s.date === dateStr);
 
     if (index >= 0) {
-      // Small delay ensures the SectionList is ready and the Modal is closing
       setTimeout(() => {
         sectionListRef.current?.scrollToLocation({
           sectionIndex: index,
           itemIndex: 0,
           animated: true,
-          viewOffset: 0, // Adjust this if you have a sticky header covering the item
+          viewOffset: 0,
         });
       }, 100);
-    } else {
-      console.warn("Date not found in list");
     }
     setShowCalendar(false);
   };
@@ -211,7 +207,7 @@ export const FixturesScreen: React.FC = () => {
           >
             {day}
           </ThemedText>
-          {hasMatches && !isToday && <View style={[styles.matchDot, { backgroundColor: theme.primary }]} />}
+          {hasMatches && !isToday && <View style={[styles.matchDot, { backgroundColor: isDark ? theme.text : theme.primary }]} />}
         </TouchableOpacity>
       );
     }
@@ -238,7 +234,7 @@ export const FixturesScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <LinearGradient colors={[theme.primary, '#42a5f5']} style={styles.header}>
+      <LinearGradient colors={isDark ? [theme.surface, theme.background] : [theme.primary, theme.primaryDark]} style={styles.header}>
         <ThemedText variant="title" color="white" weight="bold" style={styles.headerTitle}>Fixtures</ThemedText>
 
         <View style={styles.filterContainer}>
@@ -247,7 +243,7 @@ export const FixturesScreen: React.FC = () => {
               <TouchableOpacity
                 key={fmt}
                 onPress={() => setSelectedFormat(fmt)}
-                style={[styles.filterTab, selectedFormat === fmt && styles.activeTab]}
+                style={[styles.filterTab, selectedFormat === fmt && { backgroundColor: theme.surface }]}
               >
                 <ThemedText variant="small" weight="bold" style={{ color: selectedFormat === fmt ? theme.primary : 'white' }}>
                   {fmt}
@@ -369,7 +365,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
     marginRight: 10,
   },
-  activeTab: { backgroundColor: 'white' },
   calendarBtn: {
     paddingHorizontal: 15,
     borderLeftWidth: 1,
@@ -379,7 +374,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.05)',
   },
   matchCard: {
     marginHorizontal: spacing.md,

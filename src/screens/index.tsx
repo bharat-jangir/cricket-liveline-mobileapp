@@ -14,7 +14,7 @@ import { createMaterialTopTabNavigator } from '@react-navigation/material-top-ta
 const Tab = createMaterialTopTabNavigator();
 
 const MatchList = ({ route }: any) => {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const activeTab = route.name.toLowerCase();
 
   const matches = [
@@ -30,9 +30,9 @@ const MatchList = ({ route }: any) => {
   const renderMatch = ({ item }: any) => (
     <TouchableOpacity style={[styles.matchCard, { backgroundColor: theme.surface }]} activeOpacity={0.7}>
       {item.status === 'live' && (
-        <View style={styles.liveBadge}>
-          <View style={styles.liveDot} />
-          <ThemedText variant="caption" color="white" weight="bold">LIVE</ThemedText>
+        <View style={[styles.liveBadge, { backgroundColor: isDark ? theme.surface : '#FF3B30' }]}>
+          <View style={[styles.liveDot, { backgroundColor: isDark ? '#FF3B30' : 'white' }]} />
+          <ThemedText variant="caption" color={isDark ? 'text' : 'white'} weight="bold">LIVE</ThemedText>
         </View>
       )}
 
@@ -56,10 +56,10 @@ const MatchList = ({ route }: any) => {
             )}
             {item.odds1 && item.odds2 && (
               <View style={styles.oddsContainer}>
-                <View style={styles.oddsBadgeRed}>
-                  <ThemedText variant="caption" color="white" weight="bold">{item.odds1}</ThemedText>
+                <View style={[styles.oddsBadgeRed, { backgroundColor: isDark ? theme.border : '#FF3B30' }]}>
+                  <ThemedText variant="caption" color={isDark ? 'text' : 'white'} weight="bold">{item.odds1}</ThemedText>
                 </View>
-                <View style={styles.oddsBadgeBlue}>
+                <View style={[styles.oddsBadgeBlue, { backgroundColor: isDark ? theme.primary : '#1877f2' }]}>
                   <ThemedText variant="caption" color="white" weight="bold">{item.odds2}</ThemedText>
                 </View>
               </View>
@@ -112,11 +112,11 @@ const MatchList = ({ route }: any) => {
 };
 
 export const MatchesScreen: React.FC = () => {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={[theme.primary, theme.primary + 'dd']} style={styles.header}>
+      <LinearGradient colors={isDark ? [theme.surface, theme.background] : [theme.primary, theme.primaryDark]} style={styles.header}>
         <ThemedText variant="title" color="white" weight="bold">Matches</ThemedText>
       </LinearGradient>
       <Tab.Navigator

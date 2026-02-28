@@ -52,47 +52,61 @@ export const fontSize = {
 
 // Colors - Premium App Theme
 export const lightTheme = {
-  primary: '#1877f2', // Facebook blue
-  primaryLight: '#42a5f5',
-  primaryDark: '#1565c0',
-  secondary: '#00bcd4',
-  background: '#f8f9fa', // Light gray background
+  primary: '#1877f2', // Sky 600
+  primaryLight: '#1877f2', // Sky 400
+  primaryDark: '#0369a1', // Sky 700
+  secondary: '#0ea5e9',
+  background: '#f8fafc', // Slate 50
   surface: '#ffffff',
   card: '#ffffff',
-  text: '#1c1e21', // Dark text
-  textSecondary: '#65676b', // Medium gray
-  textLight: '#8a8d91', // Light gray
-  border: '#dadde1', // Light border
-  borderLight: '#e4e6ea',
-  success: '#42b883',
-  warning: '#ff9800',
-  error: '#f44336',
-  info: '#2196f3',
-  shadow: 'rgba(0, 0, 0, 0.08)',
-  overlay: 'rgba(0, 0, 0, 0.4)',
-  accent: '#00d4aa', // Teal accent
+  text: '#0f172a', // Slate 900
+  textSecondary: '#475569', // Slate 600
+  textLight: '#94a3b8', // Slate 400
+  border: '#e2e8f0', // Slate 200
+  borderLight: '#f1f5f9', // Slate 100
+  success: '#10b981',
+  warning: '#f59e0b',
+  error: '#ef4444',
+  info: '#3b82f6',
+  shadow: 'rgba(0, 0, 0, 0.05)',
+  overlay: 'rgba(15, 23, 42, 0.4)',
+  accent: '#06b6d4',
+  // Semantic tokens
+  headerBackground: '#0284c7',
+  glassBackground: 'rgba(255, 255, 255, 0.8)',
+  activeTab: '#0284c7',
+  inactiveTab: '#64748b',
+  cardBorder: '#e2e8f0',
+  divider: '#f1f5f9',
 };
 
 export const darkTheme = {
-  primary: '#1877f2',
-  primaryLight: '#42a5f5',
-  primaryDark: '#1565c0',
-  secondary: '#00bcd4',
-  background: '#18191a', // Dark background
-  surface: '#242526', // Card background
-  card: '#242526',
-  text: '#e4e6ea', // Light text
-  textSecondary: '#b0b3b8', // Medium gray
-  textLight: '#8a8d91', // Darker gray
-  border: '#3a3b3c', // Dark border
-  borderLight: '#2f3031',
-  success: '#42b883',
-  warning: '#ff9800',
-  error: '#f44336',
-  info: '#2196f3',
-  shadow: 'rgba(0, 0, 0, 0.3)',
-  overlay: 'rgba(0, 0, 0, 0.7)',
-  accent: '#00d4aa',
+  primary: '#38bdf8', // Sky 400
+  primaryLight: '#7dd3fc',
+  primaryDark: '#0284c7',
+  secondary: '#0ea5e9',
+  background: '#020617', // Midnight/Slate 950
+  surface: '#0f172a', // Slate 900
+  card: '#1e293b', // Slate 800
+  text: '#f8fafc', // Slate 50
+  textSecondary: '#94a3b8', // Slate 400
+  textLight: '#64748b', // Slate 500
+  border: '#2d333b', // Custom dark border
+  borderLight: '#1e293b',
+  success: '#10b981',
+  warning: '#f59e0b',
+  error: '#ef4444',
+  info: '#3b82f6',
+  shadow: 'rgba(0, 0, 0, 0.4)',
+  overlay: 'rgba(0, 0, 0, 0.6)',
+  accent: '#06b6d4',
+  // Semantic tokens
+  headerBackground: '#0f172a',
+  glassBackground: 'rgba(15, 23, 42, 0.8)',
+  activeTab: '#38bdf8',
+  inactiveTab: '#94a3b8',
+  cardBorder: '#334155',
+  divider: '#1e293b',
 };
 
 export type Theme = typeof lightTheme;

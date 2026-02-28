@@ -110,7 +110,7 @@ const newsCards = [
 ];
 
 export const HomeScreen: React.FC = () => {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const newsCarouselRef = useRef<FlatList>(null);
   const [currentNewsIndex, setCurrentNewsIndex] = React.useState(0);
@@ -238,7 +238,7 @@ export const HomeScreen: React.FC = () => {
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Header */}
       <LinearGradient
-        colors={isExpanded ? ["#1877f2", "#42a5f5"] : ["transparent", "transparent"]}
+        colors={isExpanded ? (isDark ? [theme.surface, theme.background] : [theme.primary, theme.primaryDark]) : ["transparent", "transparent"]}
         style={[styles.header, { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20 }]}
       >
         <View style={styles.headerContent}>
@@ -296,8 +296,8 @@ export const HomeScreen: React.FC = () => {
                 {
                   backgroundColor:
                     index === currentNewsIndex
-                      ? "#1877f2"
-                      : "rgba(255,255,255,0.5)",
+                      ? theme.primary
+                      : isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)",
                 },
               ]}
             />
@@ -328,19 +328,19 @@ export const HomeScreen: React.FC = () => {
         <View style={[styles.breadcrumbNav, { backgroundColor: theme.surface }]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.breadcrumbContainer}>
             <TouchableOpacity onPress={() => navigation.navigate('Main', { screen: 'Matches' })}>
-              <ThemedText style={[styles.breadcrumbText, { color: theme.text, backgroundColor: theme.primary + '15' }]}>Matches <Ionicons name="chevron-forward" size={14} color={theme.text} /></ThemedText>
+              <ThemedText style={[styles.breadcrumbText, { color: theme.text, backgroundColor: isDark ? theme.border : theme.primary + '10' }]}>Matches <Ionicons name="chevron-forward" size={14} color={theme.text} /></ThemedText>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => navigation.navigate('Main', { screen: 'Fixtures' })}>
-              <ThemedText style={[styles.breadcrumbText, { color: theme.text, backgroundColor: theme.primary + '15' }]}>Fixtures <Ionicons name="chevron-forward" size={14} color={theme.text} /></ThemedText>
+              <ThemedText style={[styles.breadcrumbText, { color: theme.text, backgroundColor: isDark ? theme.border : theme.primary + '10' }]}>Fixtures <Ionicons name="chevron-forward" size={14} color={theme.text} /></ThemedText>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => navigation.navigate('Rankings')}>
-              <ThemedText style={[styles.breadcrumbText, { color: theme.text, backgroundColor: theme.primary + '15' }]}>Rankings <Ionicons name="chevron-forward" size={14} color={theme.text} /></ThemedText>
+              <ThemedText style={[styles.breadcrumbText, { color: theme.text, backgroundColor: isDark ? theme.border : theme.primary + '10' }]}>Rankings <Ionicons name="chevron-forward" size={14} color={theme.text} /></ThemedText>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => console.log('Market Book pressed')}>
-              <ThemedText style={[styles.breadcrumbText, { color: theme.text, backgroundColor: theme.primary + '15' }]}>Market Book <Ionicons name="chevron-forward" size={14} color={theme.text} /></ThemedText>
+              <ThemedText style={[styles.breadcrumbText, { color: theme.text, backgroundColor: isDark ? theme.border : theme.primary + '10' }]}>Market Book <Ionicons name="chevron-forward" size={14} color={theme.text} /></ThemedText>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -411,7 +411,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
   },
   logo: {
     width: 32,
@@ -629,7 +629,7 @@ const styles = StyleSheet.create({
   },
   newsCardImageContainer: {
     height: 120,
-    backgroundColor: '#1877f220',
+    backgroundColor: 'rgba(56, 189, 248, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },

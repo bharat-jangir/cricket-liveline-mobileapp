@@ -52,7 +52,7 @@ const venueNews = [
 
 // --- Tabs ---
 function OverviewTab() {
-    const { theme } = useTheme();
+    const { theme, isDark } = useTheme();
     return (
         <ScrollView style={{ flex: 1, backgroundColor: theme.background }} contentContainerStyle={{ padding: spacing.md }}>
             <View style={{ backgroundColor: theme.card, padding: spacing.md, borderRadius: 12, borderWidth: 1, borderColor: theme.border }}>
@@ -137,7 +137,7 @@ const DistanceLabel = ({ distance, angle }: { distance: number, angle: number })
 }
 
 function MatchesTab() {
-    const { theme } = useTheme();
+    const { theme, isDark } = useTheme();
     const [gender, setGender] = useState<'Men' | 'Women'>('Men');
     const [matchType, setMatchType] = useState('All');
     const [expandedSeries, setExpandedSeries] = useState<Record<string, boolean>>({});
@@ -241,7 +241,7 @@ function MatchesTab() {
 }
 
 function StatsTab() {
-    const { theme } = useTheme();
+    const { theme, isDark } = useTheme();
     const [gender, setGender] = useState<'Men' | 'Women'>('Men');
     const [matchType, setMatchType] = useState('T20I');
     const stats = venueStats['t20']; // Using t20 mock data for now
@@ -432,7 +432,7 @@ function StatsTab() {
 }
 
 function NewsTab() {
-    const { theme } = useTheme();
+    const { theme, isDark } = useTheme();
     const navigation = useNavigation<any>();
 
     return (
@@ -467,7 +467,7 @@ function NewsTab() {
 }
 
 function AboutTab() {
-    const { theme } = useTheme();
+    const { theme, isDark } = useTheme();
     const bottomSheetRef = useRef<BottomSheet>(null);
     const snapPoints = useMemo(() => ['50%', '80%'], []);
 
@@ -551,7 +551,7 @@ function AboutTab() {
 
 // --- Main Navigator ---
 export const VenueDetailScreen: React.FC = () => {
-    const { theme } = useTheme();
+    const { theme, isDark } = useTheme();
     const navigation = useNavigation();
     const route = useRoute<any>();
 
@@ -561,7 +561,7 @@ export const VenueDetailScreen: React.FC = () => {
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
-            <LinearGradient colors={[theme.primary, theme.primaryDark]} style={styles.header}>
+            <LinearGradient colors={isDark ? [theme.surface, theme.background] : [theme.primary, theme.primaryDark]} style={styles.header}>
                 <SafeAreaView>
                     <View style={styles.headerTop}>
                         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>

@@ -12,7 +12,7 @@ import { Text as ThemedText } from '../components/ui/Text';
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
 export const AllVenuesScreen: React.FC = () => {
-    const { theme } = useTheme();
+    const { theme, isDark } = useTheme();
     const navigation = useNavigation<NavigationProp>();
     const [searchQuery, setSearchQuery] = useState('');
     const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -56,7 +56,7 @@ export const AllVenuesScreen: React.FC = () => {
         >
             <Image
                 source={{ uri: item.image }}
-                style={styles.venueImage}
+                style={[styles.venueImage, { backgroundColor: isDark ? theme.border : '#f0f0f0' }]}
                 resizeMode="cover"
             />
             <View style={styles.venueInfo}>
@@ -109,6 +109,7 @@ export const AllVenuesScreen: React.FC = () => {
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                         autoCorrect={false}
+                        allowFontScaling={false}
                     />
                     {searchQuery.length > 0 && (
                         <TouchableOpacity onPress={() => setSearchQuery('')}>
@@ -201,7 +202,6 @@ const styles = StyleSheet.create({
         height: 80,
         borderRadius: borderRadius.md,
         marginRight: spacing.md,
-        backgroundColor: '#f0f0f0',
     },
     venueInfo: {
         flex: 1,

@@ -86,7 +86,7 @@ const MOCK_POINTS_TABLE = [
 // --- Sub Tabs ---
 
 const OverviewTab = () => {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
 
   return (
     <ScrollView style={styles.tabContent} contentContainerStyle={styles.tabContentPadding}>
@@ -231,7 +231,7 @@ const OverviewTab = () => {
 };
 
 const FixturesTab = () => {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const { width } = useWindowDimensions();
   const isTablet = width > 768;
 
@@ -265,7 +265,7 @@ const FixturesTab = () => {
 };
 
 const TeamsTab = () => {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const { width } = useWindowDimensions();
   const isTablet = width > 768;
 
@@ -381,7 +381,7 @@ const TeamsTab = () => {
 };
 
 const StatsTab = () => {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const { width } = useWindowDimensions();
   const isTablet = width > 768;
 
@@ -426,8 +426,8 @@ const StatsTab = () => {
 };
 
 const VenuesTab = () => {
-  const navigation = useNavigation<any>(); // any is used to bypass unpopulated NavigationParamList types for now
-  const { theme } = useTheme();
+  const navigation = useNavigation<any>();
+  const { theme, isDark } = useTheme();
 
   return (
     <FlatList
@@ -458,7 +458,9 @@ const VenuesTab = () => {
 };
 
 const NewsTab = () => {
+  const { theme, isDark } = useTheme();
   const { width } = useWindowDimensions();
+  const navigation = useNavigation<any>();
   const isTablet = width > 768;
 
   return (
@@ -469,13 +471,19 @@ const NewsTab = () => {
       key={`news-${isTablet ? 2 : 1}`}
       contentContainerStyle={styles.tabContentPadding}
       renderItem={({ item }) => (
-        <Card padding="xs" style={[isTablet ? styles.gridItem2Cols : styles.mb, styles.row, { marginBottom: isTablet ? 0 : spacing.md }]}>
-          <Image source={{ uri: item.image }} style={styles.thumbnailRect} />
-          <View style={{ flex: 1, padding: spacing.md, justifyContent: 'space-between' }}>
-            <ThemedText weight="bold" numberOfLines={2}>{item.title}</ThemedText>
-            <ThemedText variant="small" color="textSecondary">{item.time}</ThemedText>
-          </View>
-        </Card>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate('NewsDetail', { newsId: item.id })}
+          style={[isTablet ? styles.gridItem2Cols : styles.mb, styles.row, { marginBottom: isTablet ? 0 : spacing.md }]}
+        >
+          <Card padding="xs" style={styles.row}>
+            <Image source={{ uri: item.image }} style={styles.thumbnailRect} />
+            <View style={{ flex: 1, padding: spacing.md, justifyContent: 'space-between' }}>
+              <ThemedText weight="bold" numberOfLines={2}>{item.title}</ThemedText>
+              <ThemedText variant="small" color="textSecondary">{item.time}</ThemedText>
+            </View>
+          </Card>
+        </TouchableOpacity>
       )}
       columnWrapperStyle={isTablet && styles.rowGap}
       ItemSeparatorComponent={() => isTablet ? <View style={{ height: spacing.md }} /> : null}
@@ -484,6 +492,7 @@ const NewsTab = () => {
 };
 
 const VideosTab = () => {
+  const { theme, isDark } = useTheme();
   const { width } = useWindowDimensions();
   const isTablet = width > 768;
 
@@ -518,7 +527,7 @@ const VideosTab = () => {
 const POINTS_GROUPS = ['Group A', 'Group B', 'Super 8', 'Group 1'];
 
 const PointsTab = () => {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const [selectedGroup, setSelectedGroup] = React.useState(POINTS_GROUPS[0]);
 
   return (
@@ -602,7 +611,7 @@ const PointsTab = () => {
 // --- Main Navigator ---
 
 export const SeriesDetailScreen: React.FC = () => {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const navigation = useNavigation();
 
   // Conditional flag for Points Table
@@ -610,7 +619,7 @@ export const SeriesDetailScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <LinearGradient colors={[theme.primary, theme.primaryDark]} style={styles.header}>
+      <LinearGradient colors={isDark ? [theme.surface, theme.background] : [theme.primary, theme.primaryDark]} style={styles.header}>
         <SafeAreaView>
           <View style={styles.headerTop}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>

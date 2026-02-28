@@ -1,7 +1,6 @@
 import React from "react";
 import {
   View,
-  Text,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
@@ -53,7 +52,7 @@ export const OnboardingScreen: React.FC = () => {
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* ⭐ PREMIUM HEADER ⭐ */}
       <LinearGradient
-        colors={["#1877f2", "#42a5f5"]}
+        colors={isDark ? [theme.surface, theme.background] : [theme.primary, theme.primaryDark]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.header}
@@ -68,10 +67,10 @@ export const OnboardingScreen: React.FC = () => {
           </View>
 
           <View style={styles.textWrapper}>
-            <Text style={styles.appTitle}>C</Text>
-            <Text style={styles.subTitle}>
+            <ThemedText style={styles.appTitle}>C</ThemedText>
+            <ThemedText style={styles.subTitle}>
               Stay ahead with real-time match insights ⚡
-            </Text>
+            </ThemedText>
           </View>
         </View>
       </LinearGradient>
@@ -116,7 +115,7 @@ export const OnboardingScreen: React.FC = () => {
                   },
                 ]}
               >
-                <Text style={styles.languageFlag}>{lang.flag}</Text>
+                <ThemedText style={styles.languageFlag}>{lang.flag}</ThemedText>
 
                 <ThemedText
                   variant="small"
