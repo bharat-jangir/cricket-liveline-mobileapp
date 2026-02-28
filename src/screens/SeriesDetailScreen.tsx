@@ -89,7 +89,7 @@ const OverviewTab = () => {
   const { theme, isDark } = useTheme();
 
   return (
-    <ScrollView style={styles.tabContent} contentContainerStyle={styles.tabContentPadding}>
+    <ScrollView style={[styles.tabContent, { backgroundColor: theme.background }]} contentContainerStyle={styles.tabContentPadding}>
 
       {/* Top Performers Section */}
       <View style={[styles.row, styles.mb, { alignItems: 'center' }]}>
@@ -239,6 +239,7 @@ const FixturesTab = () => {
     <FlatList
       data={MOCK_FIXTURES}
       keyExtractor={item => item.id}
+      style={{ backgroundColor: theme.background }}
       contentContainerStyle={[styles.tabContentPadding, isTablet && styles.gridContainer]}
       numColumns={isTablet ? 2 : 1}
       key={isTablet ? 'tablet' : 'phone'}
@@ -291,7 +292,7 @@ const TeamsTab = () => {
   }, [selectedTeam, roleFilter]);
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
       <FlatList
         data={MOCK_TEAMS}
         keyExtractor={item => item.id}
@@ -391,6 +392,7 @@ const StatsTab = () => {
       keyExtractor={item => item.id}
       numColumns={isTablet ? 2 : 1}
       key={`stats-${isTablet ? 2 : 1}`}
+      style={{ backgroundColor: theme.background }}
       contentContainerStyle={styles.tabContentPadding}
       renderItem={({ item, index }) => (
         <Card style={[
@@ -435,6 +437,7 @@ const VenuesTab = () => {
       keyExtractor={item => item.id}
       numColumns={1}
       key={`venues-1`}
+      style={{ backgroundColor: theme.background }}
       contentContainerStyle={styles.tabContentPadding}
       renderItem={({ item }) => (
         <TouchableOpacity activeOpacity={0.8} onPress={() => navigation.navigate('VenueDetail', { venueId: item.id })}>
@@ -469,6 +472,7 @@ const NewsTab = () => {
       keyExtractor={item => item.id}
       numColumns={isTablet ? 2 : 1}
       key={`news-${isTablet ? 2 : 1}`}
+      style={{ backgroundColor: theme.background }}
       contentContainerStyle={styles.tabContentPadding}
       renderItem={({ item }) => (
         <TouchableOpacity
@@ -502,6 +506,7 @@ const VideosTab = () => {
       keyExtractor={item => item.id}
       numColumns={isTablet ? 3 : 2}
       key={`videos-${isTablet ? 3 : 2}`}
+      style={{ backgroundColor: theme.background }}
       contentContainerStyle={styles.tabContentPadding}
       columnWrapperStyle={styles.rowGap}
       renderItem={({ item }) => (
@@ -531,7 +536,7 @@ const PointsTab = () => {
   const [selectedGroup, setSelectedGroup] = React.useState(POINTS_GROUPS[0]);
 
   return (
-    <ScrollView style={styles.tabContent} contentContainerStyle={styles.tabContentPadding}>
+    <ScrollView style={[styles.tabContent, { backgroundColor: theme.background }]} contentContainerStyle={styles.tabContentPadding}>
       {/* Group Selector */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.md }}>
         {POINTS_GROUPS.map((group) => (
@@ -556,7 +561,7 @@ const PointsTab = () => {
 
       <Card style={{ padding: 0, overflow: 'hidden' }}>
         {/* Table Header */}
-        <View style={[styles.row, styles.tableHeader, { backgroundColor: theme.surface }]}>
+        <View style={[styles.row, styles.tableHeader, { backgroundColor: theme.surface, borderBottomColor: theme.borderLight }]}>
           <ThemedText variant="small" weight="bold" color="textSecondary" style={{ flex: 3 }}>Team</ThemedText>
           <ThemedText variant="small" weight="bold" color="textSecondary" style={styles.tableCol}>M</ThemedText>
           <ThemedText variant="small" weight="bold" color="textSecondary" style={styles.tableCol}>W</ThemedText>
@@ -644,8 +649,14 @@ export const SeriesDetailScreen: React.FC = () => {
           tabBarActiveTintColor: theme.primary,
           tabBarInactiveTintColor: theme.textSecondary,
           tabBarIndicatorStyle: { backgroundColor: theme.primary, height: 3 },
-          tabBarStyle: { backgroundColor: theme.surface, elevation: 2 },
-          tabBarLabelStyle: { fontWeight: 'bold', textTransform: 'capitalize' },
+          tabBarStyle: {
+            backgroundColor: theme.surface,
+            elevation: 0,
+            shadowOpacity: 0,
+            borderBottomWidth: 1,
+            borderBottomColor: theme.borderLight,
+          },
+          tabBarLabelStyle: { fontWeight: 'bold', textTransform: 'capitalize', fontSize: 13 },
           tabBarAllowFontScaling: false,
           tabBarScrollEnabled: true,
           lazy: true,
@@ -714,7 +725,7 @@ const styles = StyleSheet.create({
   roleFilterTab: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: 20, marginRight: spacing.sm },
 
   // Custom Styles for Points Table
-  tableHeader: { paddingVertical: spacing.sm, paddingHorizontal: spacing.sm, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.1)' },
+  tableHeader: { paddingVertical: spacing.sm, paddingHorizontal: spacing.sm, borderBottomWidth: 1 },
   tableRow: { paddingVertical: spacing.sm, paddingHorizontal: spacing.sm, borderBottomWidth: 1, alignItems: 'center' },
   tableCol: { flex: 1, textAlign: 'center' },
   qualifierIndicator: { width: 4, height: 24, borderTopRightRadius: 4, borderBottomRightRadius: 4, position: 'absolute', left: 0 },
