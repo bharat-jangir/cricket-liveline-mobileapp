@@ -26,6 +26,7 @@ import { VenueDetailScreen } from '@/screens/VenueDetailScreen';
 import { AllVenuesScreen } from '@/screens/AllVenuesScreen';
 import { AllPlayersScreen } from '@/screens/AllPlayersScreen';
 import { PlayerProfileScreen } from '@/screens/PlayerProfileScreen';
+import { MatchDetailScreen } from '@/screens/MatchDetailScreen';
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -195,6 +196,11 @@ const AppNavigator = () => {
       <Stack.Screen
         name="AllPlayers"
         component={AllPlayersScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="MatchDetails"
+        component={MatchDetailScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

@@ -180,25 +180,30 @@ export const HomeScreen: React.FC = () => {
   );
 
   const renderLiveMatch = ({ item }: { item: (typeof liveMatchesData)[0] }) => (
-    <Card style={styles.liveMatchCard}>
-      <View style={styles.cardHeader}>
-        <ThemedText style={[styles.matchTitleText, { color: theme.textSecondary }]}>
-          {item.team1} vs {item.team2}
-        </ThemedText>
-        <View style={styles.liveIndicator}>
-          <View style={styles.liveDot} />
-          <ThemedText style={styles.liveText}>LIVE</ThemedText>
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={() => navigation.navigate('MatchDetails', { matchId: item.id })}
+    >
+      <Card style={styles.liveMatchCard} elevation="md">
+        <View style={styles.cardHeader}>
+          <ThemedText style={[styles.matchTitleText, { color: theme.textSecondary }]}>
+            {item.team1} vs {item.team2}
+          </ThemedText>
+          <View style={styles.liveIndicator}>
+            <View style={styles.liveDot} />
+            <ThemedText style={styles.liveText}>LIVE</ThemedText>
+          </View>
         </View>
-      </View>
-      <View style={styles.matchInfo}>
-        <ThemedText style={[styles.teamScore, { color: theme.text }]}>
-          {item.team1} ({item.score1})
-        </ThemedText>
-        <ThemedText style={[styles.teamScore, { color: theme.text }]}>
-          {item.team2} ({item.score2})
-        </ThemedText>
-      </View>
-    </Card>
+        <View style={styles.matchInfo}>
+          <ThemedText style={[styles.teamScore, { color: theme.text }]}>
+            {item.team1} ({item.score1})
+          </ThemedText>
+          <ThemedText style={[styles.teamScore, { color: theme.text }]}>
+            {item.team2} ({item.score2})
+          </ThemedText>
+        </View>
+      </Card>
+    </TouchableOpacity>
   );
 
   const renderNewsCard = ({ item }: { item: (typeof newsCards)[0] }) => (
@@ -352,7 +357,7 @@ export const HomeScreen: React.FC = () => {
           style={styles.scrollContent}
         >
           {/* Live Matches Section */}
-          <View style={[styles.section, { paddingHorizontal: spacing.lg }]}>
+          <View style={[styles.section, { paddingHorizontal: spacing.lg, paddingVertical: 5 }]}>
             <FlatList
               data={liveMatchesData}
               renderItem={renderLiveMatch}
@@ -577,12 +582,8 @@ const styles = StyleSheet.create({
     marginRight: spacing.md,
     padding: spacing.sm,
     borderRadius: borderRadius.md,
-    overflow: 'hidden',
-    elevation: 0.5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
+    borderWidth: 0.002,
+
   },
   cardHeader: {
     flexDirection: "row",

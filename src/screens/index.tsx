@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, FlatList } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 export * from './AllVenuesScreen';
 export * from './AllPlayersScreen';
 export * from './PlayerProfileScreen';
@@ -15,6 +16,7 @@ const Tab = createMaterialTopTabNavigator();
 
 const MatchList = ({ route }: any) => {
   const { theme, isDark } = useTheme();
+  const navigation = useNavigation<any>();
   const activeTab = route.name.toLowerCase();
 
   const matches = [
@@ -28,7 +30,11 @@ const MatchList = ({ route }: any) => {
   const filteredMatches = matches.filter(m => m.status === activeTab);
 
   const renderMatch = ({ item }: any) => (
-    <TouchableOpacity style={[styles.matchCard, { backgroundColor: theme.surface }]} activeOpacity={0.7}>
+    <TouchableOpacity
+      style={[styles.matchCard, { backgroundColor: theme.surface }]}
+      activeOpacity={0.7}
+      onPress={() => navigation.navigate('MatchDetails', { matchId: item.id })}
+    >
       {item.status === 'live' && (
         <View style={[styles.liveBadge, { backgroundColor: isDark ? theme.surface : '#FF3B30' }]}>
           <View style={[styles.liveDot, { backgroundColor: isDark ? '#FF3B30' : 'white' }]} />
