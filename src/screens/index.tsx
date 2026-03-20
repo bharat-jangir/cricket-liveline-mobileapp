@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, FlatList } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { MatchService, MatchFilters } from '../services/match.service';
+import { useFetch } from '../hooks/useFetch';
 export * from './AllVenuesScreen';
 export * from './AllPlayersScreen';
 export * from './PlayerProfileScreen';
@@ -18,101 +20,136 @@ const Tab = createMaterialTopTabNavigator();
 const MatchList = ({ route }: any) => {
   const { theme, isDark } = useTheme();
   const navigation = useNavigation<any>();
-  const activeTab = route.name.toLowerCase();
+  const activeTab = route.name.toLowerCase(); // 'live', 'upcoming', 'recent'
+  
+  // Map tab name to API status
+  const statusMap: Record<string, MatchFilters['status']> = {
+    live: 'live',
+    upcoming: 'scheduled',
+    recent: 'completed'
+  };
 
-  const matches = [
-    { id: '1', series: 'ICC World Cup 2024', format: 'ODI', team1: 'India', team1Code: 'IND', team1Score: '287/4', team1Overs: '45.2', team2: 'Australia', team2Code: 'AUS', team2Score: '180/6', team2Overs: '32.1', status: 'live', venue: 'Wankhede Stadium', info: 'IND need 108 runs', odds1: '80', odds2: '90' },
-    { id: '2', series: 'IPL 2024', format: 'T20', team1: 'Mumbai Indians', team1Code: 'MI', team1Score: '185/6', team1Overs: '20.0', team2: 'Chennai Super Kings', team2Code: 'CSK', team2Score: '178/8', team2Overs: '20.0', status: 'live', venue: 'Wankhede Stadium', info: 'MI won by 7 runs', odds1: '75', odds2: '85' },
-    { id: '3', series: 'Border-Gavaskar Trophy', format: 'Test', team1: 'India', team1Code: 'IND', team2: 'Australia', team2Code: 'AUS', status: 'upcoming', venue: 'MCG, Melbourne', time: 'Today, 9:30 AM', odds1: '92', odds2: '88' },
-    { id: '4', series: 'England vs New Zealand', format: 'T20I', team1: 'England', team1Code: 'ENG', team2: 'New Zealand', team2Code: 'NZ', status: 'upcoming', venue: 'Lord\'s, London', time: 'Tomorrow, 3:00 PM', odds1: '70', odds2: '95' },
-    { id: '5', series: 'Pakistan vs South Africa', format: 'ODI', team1: 'Pakistan', team1Code: 'PAK', team1Score: '245/8', team1Overs: '50.0', team2: 'South Africa', team2Code: 'SA', team2Score: '248/5', team2Overs: '47.3', status: 'recent', venue: 'National Stadium', info: 'SA won by 5 wickets' },
-  ];
-
-  const filteredMatches = matches.filter(m => m.status === activeTab);
-
-  const renderMatch = ({ item }: any) => (
-    <TouchableOpacity
-      style={[styles.matchCard, { backgroundColor: theme.surface }]}
-      activeOpacity={0.7}
-      onPress={() => navigation.navigate('MatchDetails', { matchId: item.id })}
-    >
-      {item.status === 'live' && (
-        <View style={[styles.liveBadge, { backgroundColor: isDark ? theme.surface : '#FF3B30' }]}>
-          <View style={[styles.liveDot, { backgroundColor: isDark ? '#FF3B30' : 'white' }]} />
-          <ThemedText variant="caption" color={isDark ? 'text' : 'white'} weight="bold">LIVE</ThemedText>
-        </View>
-      )}
-
-      <View style={styles.matchHeader}>
-        <ThemedText variant="caption" color="textSecondary">{item.series} • {item.format}</ThemedText>
-        <ThemedText variant="caption" color="textSecondary">{item.venue}</ThemedText>
-      </View>
-
-      <View style={styles.teamsContainer}>
-        <View style={styles.teamRow}>
-          <View style={styles.teamInfo}>
-            <ThemedText variant="subtitle" weight="bold">{item.team1Code}</ThemedText>
-            <ThemedText variant="caption" color="textSecondary">{item.team1}</ThemedText>
-          </View>
-          <View style={styles.scoreRow}>
-            {item.team1Score && (
-              <View style={styles.scoreInfo}>
-                <ThemedText variant="subtitle" weight="bold">{item.team1Score}</ThemedText>
-                <ThemedText variant="caption" color="textSecondary">({item.team1Overs})</ThemedText>
-              </View>
-            )}
-            {item.odds1 && item.odds2 && (
-              <View style={styles.oddsContainer}>
-                <View style={[styles.oddsBadgeRed, { backgroundColor: isDark ? theme.border : '#FF3B30' }]}>
-                  <ThemedText variant="caption" color={isDark ? 'text' : 'white'} weight="bold">{item.odds1}</ThemedText>
-                </View>
-                <View style={[styles.oddsBadgeBlue, { backgroundColor: isDark ? theme.primary : '#1877f2' }]}>
-                  <ThemedText variant="caption" color="white" weight="bold">{item.odds2}</ThemedText>
-                </View>
-              </View>
-            )}
-          </View>
-        </View>
-
-        <View style={[styles.divider, { backgroundColor: theme.border }]} />
-
-        <View style={styles.teamRow}>
-          <View style={styles.teamInfo}>
-            <ThemedText variant="subtitle" weight="bold">{item.team2Code}</ThemedText>
-            <ThemedText variant="caption" color="textSecondary">{item.team2}</ThemedText>
-          </View>
-          {item.team2Score && (
-            <View style={styles.scoreInfo}>
-              <ThemedText variant="subtitle" weight="bold">{item.team2Score}</ThemedText>
-              <ThemedText variant="caption" color="textSecondary">({item.team2Overs})</ThemedText>
-            </View>
-          )}
-        </View>
-      </View>
-
-      {item.info && (
-        <View style={[styles.infoBar, { backgroundColor: item.status === 'live' ? theme.primary + '15' : '#34C759' + '15' }]}>
-          <ThemedText variant="caption" color={item.status === 'live' ? 'primary' : undefined} weight="semibold" style={item.status !== 'live' && { color: '#34C759' }}>
-            {item.info}
-          </ThemedText>
-        </View>
-      )}
-      {item.time && (
-        <View style={[styles.infoBar, { backgroundColor: theme.primary + '15' }]}>
-          <ThemedText variant="caption" color="primary" weight="semibold">{item.time}</ThemedText>
-        </View>
-      )}
-    </TouchableOpacity>
+  const { data: fetchedMatches, loading, execute: fetchMatches } = useFetch(
+    () => MatchService.getMatches({ status: statusMap[activeTab], limit: 20 }),
+    []
   );
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await fetchMatches();
+    setRefreshing(false);
+  }, [fetchMatches]);
+
+  useEffect(() => {
+    fetchMatches();
+  }, [activeTab]);
+
+  const renderMatch = ({ item }: any) => {
+    const team1Name = item.teamAId?.shortName || item.teamAId?.name || item.team1Code || 'T1';
+    const team2Name = item.teamBId?.shortName || item.teamBId?.name || item.team2Code || 'T2';
+    const score1 = item.liveStatus?.score || item.team1Score;
+    const overs1 = item.liveStatus?.overs || item.team1Overs;
+    const score2 = item.liveStatus?.team2Score || item.team2Score; // Backend might need adjustment for team2 score in liveStatus
+    const overs2 = item.liveStatus?.team2Overs || item.team2Overs;
+
+    return (
+      <TouchableOpacity
+        style={[styles.matchCard, { backgroundColor: theme.surface }]}
+        activeOpacity={0.7}
+        onPress={() => navigation.navigate('MatchDetails', { matchId: item._id || item.id })}
+      >
+        {item.status === 'live' && (
+          <View style={[styles.liveBadge, { backgroundColor: isDark ? theme.surface : '#FF3B30' }]}>
+            <View style={[styles.liveDot, { backgroundColor: isDark ? '#FF3B30' : 'white' }]} />
+            <ThemedText variant="caption" color={isDark ? 'text' : 'white'} weight="bold">LIVE</ThemedText>
+          </View>
+        )}
+
+        <View style={styles.matchHeader}>
+          <ThemedText variant="caption" color="textSecondary">
+            {item.seriesId?.name || item.series?.name || item.series || 'Series'} • {item.matchFormat || item.format}
+          </ThemedText>
+          <ThemedText variant="caption" color="textSecondary">{item.venueId?.name || item.venue?.name || item.venue}</ThemedText>
+        </View>
+
+        <View style={styles.teamsContainer}>
+          <View style={styles.teamRow}>
+            <View style={styles.teamInfo}>
+              <ThemedText variant="subtitle" weight="bold">{team1Name}</ThemedText>
+              <ThemedText variant="caption" color="textSecondary">{item.teamAId?.name || item.team1}</ThemedText>
+            </View>
+            <View style={styles.scoreRow}>
+              {score1 && (
+                <View style={styles.scoreInfo}>
+                  <ThemedText variant="subtitle" weight="bold">{score1}</ThemedText>
+                  {overs1 && <ThemedText variant="caption" color="textSecondary">({overs1})</ThemedText>}
+                </View>
+              )}
+              {item.oddsBlue !== undefined && item.oddsRed !== undefined && (
+                <View style={styles.oddsContainer}>
+                  <View style={[styles.oddsBadgeRed, { backgroundColor: isDark ? theme.border : '#FF3B30' }]}>
+                    <ThemedText variant="caption" color={isDark ? 'text' : 'white'} weight="bold">{item.oddsRed}</ThemedText>
+                  </View>
+                  <View style={[styles.oddsBadgeBlue, { backgroundColor: isDark ? theme.primary : '#1877f2' }]}>
+                    <ThemedText variant="caption" color="white" weight="bold">{item.oddsBlue}</ThemedText>
+                  </View>
+                </View>
+              )}
+            </View>
+          </View>
+
+          <View style={[styles.divider, { backgroundColor: theme.border }]} />
+
+          <View style={styles.teamRow}>
+            <View style={styles.teamInfo}>
+              <ThemedText variant="subtitle" weight="bold">{team2Name}</ThemedText>
+              <ThemedText variant="caption" color="textSecondary">{item.teamBId?.name || item.team2}</ThemedText>
+            </View>
+            {score2 && (
+              <View style={styles.scoreInfo}>
+                <ThemedText variant="subtitle" weight="bold">{score2}</ThemedText>
+                {overs2 && <ThemedText variant="caption" color="textSecondary">({overs2})</ThemedText>}
+              </View>
+            )}
+          </View>
+        </View>
+
+        {(item.toss?.tossText || item.result?.resultText || item.info) && (
+          <View style={[styles.infoBar, { backgroundColor: item.status === 'live' ? theme.primary + '15' : '#34C759' + '15' }]}>
+            <ThemedText variant="caption" color={item.status === 'live' ? 'primary' : undefined} weight="semibold" style={item.status !== 'live' && { color: '#34C759' }}>
+              {item.status === 'live' ? (item.toss?.tossText || item.info) : (item.result?.resultText || item.info)}
+            </ThemedText>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <FlatList
-        data={filteredMatches}
+        data={fetchedMatches || []}
         renderItem={renderMatch}
-        keyExtractor={item => item.id}
+        keyExtractor={item => item._id || item.id}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={theme.primary}
+            colors={[theme.primary]}
+          />
+        }
+        ListEmptyComponent={
+            !loading ? (
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 50 }}>
+                    <ThemedText color="textSecondary">No {activeTab} matches found</ThemedText>
+                </View>
+            ) : null
+        }
       />
     </View>
   );

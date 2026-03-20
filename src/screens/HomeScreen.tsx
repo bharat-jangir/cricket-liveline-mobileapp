@@ -8,6 +8,7 @@ import {
   Dimensions,
   Animated,
   Image,
+  RefreshControl,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,6 +19,8 @@ import { useTheme } from "../theme/ThemeContext";
 import { spacing, fontSize, borderRadius } from "../theme";
 import { Card } from "../components/ui/Card";
 import { Text as ThemedText } from "../components/ui/Text";
+import { MatchService } from "../services/match.service";
+import { useFetch } from "../hooks/useFetch";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -121,6 +124,30 @@ export const HomeScreen: React.FC = () => {
   const translateY = useRef(new Animated.Value(INITIAL_SHEET_TOP)).current;
   const [isExpanded, setIsExpanded] = useState(false);
 
+  // Fetch Live Matches
+  const { data: liveMatches, execute: fetchLiveMatches, loading: loadingLiveMatches } = useFetch(() => 
+    MatchService.getMatches({ status: 'live', limit: 10 }), 
+    []
+  );
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await fetchLiveMatches();
+    setRefreshing(false);
+  }, [fetchLiveMatches]);
+
+  useEffect(() => {
+    fetchLiveMatches();
+    // Set up polling for simple live list updates (fallback/companion to sockets)
+    const pollInterval = setInterval(() => {
+        fetchLiveMatches();
+    }, 30000); 
+    
+    return () => clearInterval(pollInterval);
+  }, []);
+
   const onScrollEndDrag = (event: any) => {
     const { contentOffset } = event.nativeEvent;
     const scrolledDistance = contentOffset.y;
@@ -179,32 +206,39 @@ export const HomeScreen: React.FC = () => {
     </TouchableOpacity>
   );
 
-  const renderLiveMatch = ({ item }: { item: (typeof liveMatchesData)[0] }) => (
-    <TouchableOpacity
-      activeOpacity={0.8}
-      onPress={() => navigation.navigate('MatchDetails', { matchId: item.id })}
-    >
-      <Card style={styles.liveMatchCard} elevation="md">
-        <View style={styles.cardHeader}>
-          <ThemedText style={[styles.matchTitleText, { color: theme.textSecondary }]}>
-            {item.team1} vs {item.team2}
-          </ThemedText>
-          <View style={styles.liveIndicator}>
-            <View style={styles.liveDot} />
-            <ThemedText style={styles.liveText}>LIVE</ThemedText>
+  const renderLiveMatch = ({ item }: { item: any }) => {
+    // Determine team names safely (could be populated object or just string id)
+    const team1Name = item.teamAId?.shortName || item.teamAId?.name || item.teamA?.shortName || item.teamA?.name || 'Team 1';
+    const team2Name = item.teamBId?.shortName || item.teamBId?.name || item.teamB?.shortName || item.teamB?.name || 'Team 2';
+    
+    return (
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={() => navigation.navigate('MatchDetails', { matchId: item._id })}
+      >
+        <Card style={styles.liveMatchCard} elevation="md">
+          <View style={styles.cardHeader}>
+            <ThemedText style={[styles.matchTitleText, { color: theme.textSecondary }]} numberOfLines={1}>
+              {team1Name} vs {team2Name}
+            </ThemedText>
+            <View style={styles.liveIndicator}>
+              <View style={styles.liveDot} />
+              <ThemedText style={styles.liveText}>LIVE</ThemedText>
+            </View>
           </View>
-        </View>
-        <View style={styles.matchInfo}>
-          <ThemedText style={[styles.teamScore, { color: theme.text }]}>
-            {item.team1} ({item.score1})
-          </ThemedText>
-          <ThemedText style={[styles.teamScore, { color: theme.text }]}>
-            {item.team2} ({item.score2})
-          </ThemedText>
-        </View>
-      </Card>
-    </TouchableOpacity>
-  );
+          <View style={styles.matchInfo}>
+            {/* Show Toss or Series temporarily if live score is not built in the list API */}
+            <ThemedText style={[styles.teamScore, { color: theme.text }]} numberOfLines={1}>
+              {item.title || item.seriesId?.name || item.series?.name || 'Match'}
+            </ThemedText>
+            <ThemedText style={[{ fontSize: 10, color: theme.textSecondary }]} numberOfLines={1}>
+              {typeof item.toss === 'string' ? item.toss : (item.toss?.tossText || item.matchState || 'Toss not updated')}
+            </ThemedText>
+          </View>
+        </Card>
+      </TouchableOpacity>
+    );
+  };
 
   const renderNewsCard = ({ item }: { item: (typeof newsCards)[0] }) => (
     <TouchableOpacity
@@ -353,19 +387,34 @@ export const HomeScreen: React.FC = () => {
         <ScrollView
           showsVerticalScrollIndicator={false}
           onScrollEndDrag={onScrollEndDrag}
-          bounces={false}
+          bounces={true}
           style={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={theme.primary}
+              colors={[theme.primary]}
+            />
+          }
         >
           {/* Live Matches Section */}
           <View style={[styles.section, { paddingHorizontal: spacing.lg, paddingVertical: 5 }]}>
-            <FlatList
-              data={liveMatchesData}
-              renderItem={renderLiveMatch}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalList}
-              nestedScrollEnabled
-            />
+            {liveMatches && liveMatches.length > 0 ? (
+              <FlatList
+                data={liveMatches}
+                renderItem={renderLiveMatch}
+                horizontal
+                keyExtractor={(item) => item._id}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalList}
+                nestedScrollEnabled
+              />
+            ) : (
+                <View style={{ padding: 10, alignItems: 'center', backgroundColor: isDark ? theme.border : theme.borderLight, borderRadius: 8 }}>
+                    <ThemedText color="textSecondary">No Live Matches right now</ThemedText>
+                </View>
+            )}
           </View>
 
           {/* News Section */}

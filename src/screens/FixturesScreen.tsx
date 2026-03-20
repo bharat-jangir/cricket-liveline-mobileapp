@@ -8,6 +8,7 @@ import {
   ScrollView,
   Animated,
   Modal,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,6 +17,8 @@ import { Text as ThemedText } from '../components/ui/Text';
 import { Card } from '../components/ui/Card';
 import { spacing, borderRadius } from '../theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MatchService } from '../services/match.service';
+import { useFetch } from '../hooks/useFetch';
 
 const getLocalYMD = (d: Date) => {
   const year = d.getFullYear();
@@ -27,14 +30,15 @@ const getLocalYMD = (d: Date) => {
 type MatchFormat = 'All' | 'T20' | 'ODI' | 'Test';
 
 interface Match {
-  id: string;
-  date: string;
-  series: string;
+  _id: string;
+  matchDate: string;
+  series: any;
   format: MatchFormat;
-  team1: { name: string; code: string };
-  team2: { name: string; code: string };
-  venue: string;
-  time: string;
+  teamA: any;
+  teamB: any;
+  venue: any;
+  title: string;
+  matchTime: string;
 }
 
 interface MatchSection {
@@ -70,15 +74,18 @@ const generateMatches = (startDate: Date, count: number, direction: 'past' | 'fu
       }
 
       matches.push({
-        id: `${direction}-${date.getTime()}-${j}`,
-        date: getLocalYMD(date),
-        series: series[Math.floor(Math.random() * series.length)],
+        _id: `${direction}-${date.getTime()}-${j}`,
+        matchDate: date.toISOString(), // Standard
+        date: getLocalYMD(date), // keep for legacy matching below
+        series: { name: series[Math.floor(Math.random() * series.length)] },
         format: formats[Math.floor(Math.random() * formats.length)],
-        team1,
-        team2,
-        venue: venues[Math.floor(Math.random() * venues.length)],
+        teamA: { name: team1.name, shortName: team1.code, code: team1.code },
+        teamB: { name: team2.name, shortName: team2.code, code: team2.code },
+        venue: { name: venues[Math.floor(Math.random() * venues.length)] },
         time: `${Math.floor(Math.random() * 12) + 1}:${['00', '30'][Math.floor(Math.random() * 2)]} ${['AM', 'PM'][Math.floor(Math.random() * 2)]}`,
-      });
+        title: "",
+        matchTime: new Date(date.setHours(10, 0, 0, 0)).toISOString(),
+      } as any);
     }
   }
   return matches;
@@ -120,10 +127,35 @@ export const FixturesScreen: React.FC = () => {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
   };
 
+  const { data: fetchedMatches, loading, execute: fetchMatches } = useFetch(() => 
+    MatchService.getMatches({ status: 'scheduled', limit: 50 }),
+    []
+  );
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await fetchMatches();
+    setRefreshing(false);
+  }, [fetchMatches]);
+
+  useEffect(() => {
+    fetchMatches();
+  }, []);
+
   const sections = useMemo(() => {
-    const filtered = selectedFormat === 'All' ? rawMatches : rawMatches.filter(m => m.format === selectedFormat);
-    const grouped = filtered.reduce((acc, m) => {
-      acc[m.date] = [...(acc[m.date] || []), m];
+    const dataSource = fetchedMatches || rawMatches;
+    
+    // Normalize format match format
+    const filtered = selectedFormat === 'All' 
+        ? dataSource 
+        : dataSource.filter((m: any) => m.matchType === selectedFormat || m.format === selectedFormat);
+        
+    const grouped = filtered.reduce((acc: any, m: any) => {
+      // Use matchDate from API, or date from mock
+      const dateKey = m.matchDate ? getLocalYMD(new Date(m.matchDate)) : m.date; 
+      acc[dateKey] = [...(acc[dateKey] || []), m];
       return acc;
     }, {} as Record<string, Match[]>);
 
@@ -132,12 +164,7 @@ export const FixturesScreen: React.FC = () => {
       date,
       data: grouped[date],
     }));
-  }, [rawMatches, selectedFormat]);
-
-  useEffect(() => {
-    const data = [...generateMatches(new Date(), 15, 'past').reverse(), ...generateMatches(new Date(), 30, 'future')];
-    setRawMatches(data);
-  }, []);
+  }, [rawMatches, fetchedMatches, selectedFormat]);
 
   const jumpToDate = (date: Date) => {
     const dateStr = getLocalYMD(date);
@@ -190,7 +217,11 @@ export const FixturesScreen: React.FC = () => {
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(currentYear, currentMonth, day);
       const dateStr = getLocalYMD(date);
-      const hasMatches = rawMatches.some(m => m.date === dateStr);
+      // Fallback search
+      const hasMatches = (fetchedMatches || rawMatches).some((m: any) => {
+          const mDate = m.matchDate ? getLocalYMD(new Date(m.matchDate)) : m.date;
+          return mDate === dateStr;
+      });
       const isToday = dateStr === todayStr;
 
       days.push(
@@ -215,22 +246,37 @@ export const FixturesScreen: React.FC = () => {
     return days;
   };
 
-  const renderMatch = ({ item }: { item: Match }) => (
-    <Card style={styles.matchCard}>
-      <View style={styles.cardHeader}>
-        <ThemedText variant="small" color="textSecondary">{item.series}</ThemedText>
-        <View style={[styles.badge, { backgroundColor: theme.primary + '15' }]}>
-          <ThemedText variant="small" weight="bold" style={{ color: theme.primary }}>{item.format}</ThemedText>
-        </View>
-      </View>
-      <View style={styles.teamsRow}>
-        <ThemedText weight="bold">{item.team1.code}</ThemedText>
-        <ThemedText color="textSecondary" style={{ marginHorizontal: 15 }}>VS</ThemedText>
-        <ThemedText weight="bold">{item.team2.code}</ThemedText>
-      </View>
-      <ThemedText variant="small" color="textSecondary">{item.venue} • {item.time}</ThemedText>
-    </Card>
-  );
+  const renderMatch = ({ item }: { item: any }) => {
+    
+    const team1Name = item.teamAId?.shortName || item.teamAId?.name || item.teamA?.shortName || item.teamA?.code || item.team1?.code || 'T1';
+    const team2Name = item.teamBId?.shortName || item.teamBId?.name || item.teamB?.shortName || item.teamB?.code || item.team2?.code || 'T2';
+    const seriesName = item.seriesId?.name || item.series?.name || item.series || 'Series';
+    const matchFormat = item.matchType || item.format || 'Format';
+    const venueName = item.venueId?.name || item.venue?.name || item.venue || 'Venue TBD';
+    const timeStr = item.matchTime ? new Date(item.matchTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : item.time || '';
+    
+    return (
+      <TouchableOpacity activeOpacity={0.8}>
+        <Card style={styles.matchCard}>
+          <View style={styles.cardHeader}>
+              <ThemedText variant="small" color="textSecondary" numberOfLines={1} style={{ flex: 1 }}>{seriesName}</ThemedText>
+              <View style={[styles.badge, { backgroundColor: theme.primary + '15' }]}>
+              <ThemedText variant="small" weight="bold" style={{ color: theme.primary }}>{matchFormat}</ThemedText>
+              </View>
+          </View>
+          <View style={styles.teamsRow}>
+              <ThemedText weight="bold">{team1Name}</ThemedText>
+              <ThemedText color="textSecondary" style={{ marginHorizontal: 15 }}>VS</ThemedText>
+              <ThemedText weight="bold">{team2Name}</ThemedText>
+          </View>
+          <View>
+              <ThemedText variant="small" color="textSecondary" numberOfLines={1}>{item.title}</ThemedText>
+              <ThemedText variant="small" color="textSecondary">{venueName} • {timeStr}</ThemedText>
+          </View>
+        </Card>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -256,9 +302,7 @@ export const FixturesScreen: React.FC = () => {
             <Ionicons name="calendar-outline" size={22} color="white" />
           </TouchableOpacity>
         </View>
-      </LinearGradient>
-
-      <SectionList
+      </LinearGradient>      <SectionList
         ref={sectionListRef}
         sections={sections}
         renderItem={renderMatch}
@@ -266,7 +310,7 @@ export const FixturesScreen: React.FC = () => {
         onViewableItemsChanged={handleViewableItemsChanged}
         viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
         stickySectionHeadersEnabled={true}
-        onScrollToIndexFailed={(info) => {
+        onScrollToIndexFailed={(info: any) => {
           setTimeout(() => {
             sectionListRef.current?.scrollToLocation({
               sectionIndex: info.highestMeasuredFrameIndex,
@@ -283,21 +327,28 @@ export const FixturesScreen: React.FC = () => {
             }, 100);
           }, 100);
         }}
-        renderSectionHeader={({ section }) => (
-          <View style={[styles.sectionHeader, { backgroundColor: theme.background }]}>
+        renderSectionHeader={({ section: { title } }) => (
+          <View style={[styles.sectionHeader, { backgroundColor: theme.background, borderBottomColor: theme.borderLight }]}>
             <ThemedText variant="small" weight="bold" style={{ color: theme.primary }}>
-              {section.title.toUpperCase()}
+              {title}
             </ThemedText>
           </View>
         )}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item._id}
         contentContainerStyle={{ paddingBottom: 120 }}
         initialNumToRender={100}
         maxToRenderPerBatch={30}
         windowSize={11}
         ListEmptyComponent={<View style={styles.empty}><ThemedText>No matches for this format</ThemedText></View>}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={theme.primary}
+            colors={[theme.primary]}
+          />
+        }
       />
-
       {showTodayBtn && (
         <Animated.View style={styles.floatingContainer}>
           <TouchableOpacity

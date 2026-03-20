@@ -9,6 +9,10 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 
+import { SeriesService } from '../services/series.service';
+import { useFetch } from '../hooks/useFetch';
+import { RefreshControl } from 'react-native';
+
 type TabType = 'all' | 'active' | 'international' | 'domestic' | 'leagues';
 
 // Define the param list for the Top Tabs
@@ -49,23 +53,36 @@ const SeriesList = () => {
     const { theme } = useTheme();
     const [search, setSearch] = useState('');
 
-    // Memoize filtering to prevent heavy calculation on every render
-    const groupedSeries = useMemo(() => {
-        const filtered = MOCK_SERIES.filter(s =>
-            (type === 'all' || (type === 'active' ? s.isActive : s.type === type)) &&
-            s.name.toLowerCase().includes(search.toLowerCase())
-        );
+    const { data: fetchedSeries, loading, execute: fetchSeries } = useFetch(
+        () => SeriesService.getSeries({ type, search }),
+        [type, search]
+    );
 
-        return filtered.reduce((acc, series) => {
-            const existing = acc.find(g => g.title === series.month);
+    const [refreshing, setRefreshing] = useState(false);
+
+    const onRefresh = React.useCallback(async () => {
+        setRefreshing(true);
+        await fetchSeries();
+        setRefreshing(false);
+    }, [fetchSeries]);
+
+    // Memoize filtering/grouping
+    const groupedSeries = useMemo(() => {
+        if (!fetchedSeries) return [];
+
+        return fetchedSeries.reduce((acc: any, series: any) => {
+            const date = series.startDate ? new Date(series.startDate) : new Date();
+            const month = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            
+            const existing = acc.find((g: any) => g.title === month);
             if (existing) {
                 existing.data.push(series);
             } else {
-                acc.push({ title: series.month, data: [series] });
+                acc.push({ title: month, data: [series] });
             }
             return acc;
-        }, [] as { title: string; data: Series[] }[]);
-    }, [search, type]);
+        }, [] as { title: string; data: any[] }[]);
+    }, [fetchedSeries]);
 
     return (
         <View style={[styles.listContainer, { backgroundColor: theme.background }]}>
@@ -91,21 +108,39 @@ const SeriesList = () => {
                 renderItem={({ item }) => (
                     <TouchableOpacity
                         style={[styles.card, { backgroundColor: theme.surface }]}
-                        onPress={() => navigation.navigate('SeriesDetail', { seriesId: item.id })}
+                        onPress={() => navigation.navigate('SeriesDetail', { seriesId: item._id || item.id })}
                         activeOpacity={0.7}
                     >
                         <View style={styles.imageContainer}>
-                            <ThemedText style={styles.emoji}>{item.image}</ThemedText>
+                            <ThemedText style={styles.emoji}>{item.image || '🏏'}</ThemedText>
                         </View>
                         <View style={styles.cardContent}>
                             <ThemedText variant="subtitle" weight="bold">{item.name}</ThemedText>
-                            <ThemedText variant="caption" color="textSecondary">{item.date}</ThemedText>
-                            <ThemedText variant="caption" color="primary" weight="semibold">{item.matches} Matches</ThemedText>
+                            <ThemedText variant="caption" color="textSecondary">
+                                {item.startDate ? new Date(item.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''} - 
+                                {item.endDate ? new Date(item.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
+                            </ThemedText>
+                            <ThemedText variant="caption" color="primary" weight="semibold">Tournament: {item.tournamentId?.name || 'Generic'}</ThemedText>
                         </View>
                     </TouchableOpacity>
                 )}
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor={theme.primary}
+                        colors={[theme.primary]}
+                    />
+                }
+                ListEmptyComponent={
+                    !loading ? (
+                        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 50 }}>
+                            <ThemedText color="textSecondary">No series found</ThemedText>
+                        </View>
+                    ) : null
+                }
             />
         </View>
     );
