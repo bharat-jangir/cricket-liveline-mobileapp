@@ -7,7 +7,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../theme/ThemeContext';
 import { Text as ThemedText } from '../components/ui/Text';
 import { spacing, fontSize, scale, elevation } from '../theme';
-
+import LogoSVG from '../../assets/cp-nobg-logo.svg';
 type SplashScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Splash'>;
 
 const AnimatedLetter: React.FC<{ letter: string; delay: number }> = ({ letter, delay }) => {
@@ -131,11 +131,7 @@ export const SplashScreen: React.FC = () => {
           ]}
         >
           <View style={[styles.logoBackground, elevation.xl]}>
-            <Image
-              source={require('../../assets/no-bg-logo.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
+            <LogoSVG width={scale(80)} height={scale(80)} style={styles.logo} />
           </View>
         </Animated.View>
 

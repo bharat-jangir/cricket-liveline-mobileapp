@@ -15,6 +15,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { spacing } from '../theme';
 import { Card } from '../components/ui/Card';
 import { Text as ThemedText } from '../components/ui/Text';
+import LogoSVG from '../../assets/cp-nobg-logo.svg';
 
 export const ProfileMenuScreen: React.FC = () => {
     const { theme, toggleTheme, isDark } = useTheme();
@@ -62,11 +63,7 @@ export const ProfileMenuScreen: React.FC = () => {
                     {isLoggedIn ? (
                         <View style={styles.profileContent}>
                             <View style={styles.avatarContainer}>
-                                <Image
-                                    source={require('../../assets/no-bg-logo.png')}
-                                    style={styles.avatar}
-                                    resizeMode="contain"
-                                />
+                                <LogoSVG width={40} height={40} style={styles.avatar} />
                             </View>
                             <View style={styles.userInfo}>
                                 <ThemedText variant="title" weight="bold">John Doe</ThemedText>

@@ -16,6 +16,7 @@ import { Card } from "../components/ui/Card";
 import { Text as ThemedText } from "../components/ui/Text";
 import { Button } from "../components/ui/Button";
 import { spacing, fontSize, borderRadius } from "../theme";
+import LogoSVG from '../../assets/cp-nobg-logo.svg';
 
 type OnboardingScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -59,11 +60,7 @@ export const OnboardingScreen: React.FC = () => {
       >
         <View style={styles.headerInner}>
           <View style={styles.logoWrapper}>
-            <Image
-              source={require("../../assets/no-bg-logo.png")}
-              style={styles.logo}
-              resizeMode="contain"
-            />
+            <LogoSVG width={56} height={56} style={styles.logo} />
           </View>
 
           <View style={styles.textWrapper}>

@@ -5,7 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'react-native';
 import { useTheme } from '@/theme/ThemeContext';
-import { fontSize } from '@/theme';
+import { fontSize, scale } from '@/theme';
 
 // Import screens - Restored after accidental deletion
 import { SplashScreen } from '@/screens/SplashScreen';
@@ -28,6 +28,7 @@ import { AllPlayersScreen } from '@/screens/AllPlayersScreen';
 import { PlayerProfileScreen } from '@/screens/PlayerProfileScreen';
 import { MatchDetailScreen } from '@/screens/MatchDetailScreen';
 import { MatchLedgerScreen } from '@/screens/MatchLedgerScreen';
+import LogoSVG from '../../assets/cp-nobg-logo.svg';
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -70,11 +71,7 @@ const MainTabNavigator = () => {
 
           if (route.name === 'Matches') {
             return (
-              <Image
-                source={require('../../assets/no-bg-logo.png')}
-                style={{ width: size, height: size, tintColor: color }}
-                resizeMode="contain"
-              />
+              <LogoSVG width={size} height={size} color={color} />
             );
           }
 

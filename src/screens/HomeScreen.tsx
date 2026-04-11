@@ -16,11 +16,13 @@ import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { useTheme } from "../theme/ThemeContext";
-import { spacing, fontSize, borderRadius } from "../theme";
+import { spacing, fontSize, borderRadius, scale, elevation } from "../theme";
 import { Card } from "../components/ui/Card";
 import { Text as ThemedText } from "../components/ui/Text";
 import { MatchService } from "../services/match.service";
 import { useFetch } from "../hooks/useFetch";
+import LogoSVG from '../../assets/cp-nobg-logo.svg';
+
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -125,8 +127,8 @@ export const HomeScreen: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Fetch Live Matches
-  const { data: liveMatches, execute: fetchLiveMatches, loading: loadingLiveMatches } = useFetch(() => 
-    MatchService.getMatches({ status: 'live', limit: 10 }), 
+  const { data: liveMatches, execute: fetchLiveMatches, loading: loadingLiveMatches } = useFetch(() =>
+    MatchService.getMatches({ status: 'live', limit: 10 }),
     []
   );
 
@@ -142,9 +144,9 @@ export const HomeScreen: React.FC = () => {
     fetchLiveMatches();
     // Set up polling for simple live list updates (fallback/companion to sockets)
     const pollInterval = setInterval(() => {
-        fetchLiveMatches();
-    }, 30000); 
-    
+      fetchLiveMatches();
+    }, 30000);
+
     return () => clearInterval(pollInterval);
   }, []);
 
@@ -210,7 +212,7 @@ export const HomeScreen: React.FC = () => {
     // Determine team names safely (AppMatchesService now outputs flattened team1 and team2 structures)
     const team1Name = item.team1?.name || item.team1?.code || item.teamAId?.shortName || 'Team 1';
     const team2Name = item.team2?.name || item.team2?.code || item.teamBId?.shortName || 'Team 2';
-    
+
     return (
       <TouchableOpacity
         activeOpacity={0.8}
@@ -283,11 +285,7 @@ export const HomeScreen: React.FC = () => {
         <View style={styles.headerContent}>
           <View style={styles.headerLeft}>
             <View style={styles.logoContainer}>
-              <Image
-                source={require("../../assets/no-bg-logo.png")}
-                style={styles.logo}
-                resizeMode="contain"
-              />
+              <LogoSVG width={scale(40)} height={scale(40)} style={styles.logo} />
             </View>
             <View>
               <ThemedText style={styles.appTitle}>Cricket Pulse</ThemedText>
@@ -411,9 +409,9 @@ export const HomeScreen: React.FC = () => {
                 nestedScrollEnabled
               />
             ) : (
-                <View style={{ padding: 10, alignItems: 'center', backgroundColor: isDark ? theme.border : theme.borderLight, borderRadius: 8 }}>
-                    <ThemedText color="textSecondary">No Live Matches right now</ThemedText>
-                </View>
+              <View style={{ padding: 10, alignItems: 'center', backgroundColor: isDark ? theme.border : theme.borderLight, borderRadius: 8 }}>
+                <ThemedText color="textSecondary">No Live Matches right now</ThemedText>
+              </View>
             )}
           </View>
 
@@ -465,7 +463,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    backgroundColor: "rgba(235, 226, 226, 0.08)",
   },
   logo: {
     width: 32,
