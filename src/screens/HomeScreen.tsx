@@ -141,12 +141,10 @@ export const HomeScreen: React.FC = () => {
   }, [fetchLiveMatches]);
 
   useEffect(() => {
-    fetchLiveMatches();
-    // Set up polling for simple live list updates (fallback/companion to sockets)
+    // Polling for live list updates every 30s (companion to sockets)
     const pollInterval = setInterval(() => {
       fetchLiveMatches();
     }, 30000);
-
     return () => clearInterval(pollInterval);
   }, []);
 
@@ -216,7 +214,11 @@ export const HomeScreen: React.FC = () => {
     return (
       <TouchableOpacity
         activeOpacity={0.8}
-        onPress={() => navigation.navigate('MatchDetails', { matchId: item._id })}
+        onPress={() => navigation.navigate('MatchDetails', { 
+          matchId: item._id || item.id,
+          team1Name: team1Name,
+          team2Name: team2Name
+        })}
       >
         <Card style={styles.liveMatchCard} elevation="md">
           <View style={styles.cardHeader}>

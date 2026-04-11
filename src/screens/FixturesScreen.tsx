@@ -140,10 +140,6 @@ export const FixturesScreen: React.FC = () => {
     setRefreshing(false);
   }, [fetchMatches]);
 
-  useEffect(() => {
-    fetchMatches();
-  }, []);
-
   const sections = useMemo(() => {
     const dataSource = fetchedMatches || rawMatches;
     

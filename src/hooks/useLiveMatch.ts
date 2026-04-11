@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 
 // Use same IP as API_URL but on port 5002 (Socket Service)
@@ -12,6 +12,7 @@ export function useLiveMatch(matchId: string) {
   const [matchStatus, setMatchStatus] = useState<any>(null);
   const [ballData, setBallData] = useState<any>(null);
   const [scorecardUpdate, setScorecardUpdate] = useState<any>(null);
+  const [commentary, setCommentary] = useState<any[]>([]);
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
@@ -37,19 +38,20 @@ export function useLiveMatch(matchId: string) {
     });
 
     // Handle generic match updates (runs, wickets, overs, matchStatus)
-    socket.on('match_update', (data) => {
+    socket.on('match_update', (data: any) => {
       console.log('[Socket] match_update received:', data);
       setMatchStatus((prev: any) => ({ ...prev, ...data }));
     });
 
-    // Handle ball-by-ball commentary updates
-    socket.on('ball_update', (data) => {
+    // Handle ball-by-ball commentary updates — accumulate newest-first, cap at 50
+    socket.on('ball_update', (data: any) => {
       console.log('[Socket] ball_update received:', data);
       setBallData(data);
+      setCommentary((prev) => [data, ...prev].slice(0, 50));
     });
 
     // Handle detailed scorecard updates
-    socket.on('scorecard_update', (data) => {
+    socket.on('scorecard_update', (data: any) => {
       console.log('[Socket] scorecard_update received:', data);
       setScorecardUpdate(data);
     });
@@ -67,6 +69,7 @@ export function useLiveMatch(matchId: string) {
     isConnected,
     matchStatus,
     ballData,
+    commentary,
     scorecardUpdate
   };
 }

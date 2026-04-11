@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import {
     View,
     StyleSheet,
@@ -6,7 +6,6 @@ import {
     ScrollView,
     Dimensions,
     Image,
-    SafeAreaView,
     Modal,
     TextInput,
     KeyboardAvoidingView,
@@ -14,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { createMaterialTopTabNavigator, MaterialTopTabBar } from '@react-navigation/material-top-tabs';
 import BottomSheet, { BottomSheetScrollView, BottomSheetBackdrop, BottomSheetBackdropProps } from '@gorhom/bottom-sheet';
@@ -25,6 +25,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { useLiveMatch } from '../hooks/useLiveMatch';
 import { MatchService } from '../services/match.service';
 import { useFetch } from '../hooks/useFetch';
+import { MatchDetailSkeleton } from '../components/MatchDetailSkeleton';
 
 type MatchDetailNavigationProp = StackNavigationProp<RootStackParamList, 'MatchDetails'>;
 
@@ -61,29 +62,86 @@ const SQUAD_DATA = {
     ]
 };
 
-const H2H_DATA = {
-    total: 15,
-    team1Wins: 8,
-    team2Wins: 6,
-    noResult: 1,
-    lastFive: ['WP', 'LIO', 'WP', 'WP', 'LIO']
+// Role icon helper
+const getRoleIcon = (role: string) => {
+    if (!role) return '🏏';
+    const r = role.toLowerCase();
+    if (r.includes('wicket')) return '🧤';
+    if (r.includes('all')) return '⭐';
+    if (r.includes('bowl')) return '🎯';
+    return '🏏';
 };
 
-// --- Tab Components ---
+// Robust squad-to-team matcher
+const resolveSquad = (squads: any[], teamObj: any, fallbackIndex: 0 | 1) => {
+    if (!squads.length) return null;
+    // Try _id match first
+    const byId = squads.find(
+        (s: any) => s.teamId?._id?.toString() === teamObj?._id?.toString()
+    );
+    if (byId) return byId;
+    // Fallback: positional (admin usually saves teamA first, then teamB)
+    return squads[fallbackIndex] ?? null;
+};
 
-const InfoTab = ({ match, onTeamPress }: { match: any, onTeamPress: (team: 'WP' | 'LIO') => void }) => {
+const TeamSquadButton = ({
+    squad, team, teamIndex, onPress, isDark, theme,
+}: {
+    squad: any; team: any; teamIndex: 0 | 1;
+    onPress: (i: 0 | 1) => void;
+    isDark: boolean; theme: any;
+}) => {
+    const pxi: any[] = squad?.playingXI || [];
+    const bench: any[] = squad?.bench || [];
+    const hasPxi = pxi.length > 0;
+    const hasBench = bench.length > 0;
+
+    let subtitle = 'Squad not announced';
+    if (hasPxi) subtitle = `Playing XI announced · ${bench.length > 0 ? bench.length + ' on bench' : ''}`.trim().replace(/· $/, '');
+    else if (hasBench) subtitle = `${bench.length} players in squad`;
+
+    return (
+        <TouchableOpacity
+            style={[styles.teamSelectorRow, { backgroundColor: isDark ? theme.surface : theme.borderLight }]}
+            onPress={() => onPress(teamIndex)}
+        >
+            <View style={styles.teamLogoBadgeSmall}>
+                {team?.logo
+                    ? <Image source={{ uri: team.logo }} style={{ width: 20, height: 20 }} />
+                    : <Ionicons name="shirt-outline" size={16} color={theme.textSecondary} />}
+            </View>
+            <View style={{ flex: 1 }}>
+                <ThemedText weight="bold">{team?.name || 'Team'}</ThemedText>
+                <ThemedText variant="caption" color={hasPxi || hasBench ? 'primary' : 'textSecondary'}>
+                    {subtitle}
+                </ThemedText>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+        </TouchableOpacity>
+    );
+};
+
+const InfoTab = ({ match, matchId, onTeamPress, squads }: {
+    match: any;
+    matchId: string;
+    onTeamPress: (teamIndex: 0 | 1) => void;
+    squads: any[];
+}) => {
     const { theme, isDark } = useTheme();
     const navigation = useNavigation<MatchDetailNavigationProp>();
 
+    const teamASquad = resolveSquad(squads, match?.teamAId, 0);
+    const teamBSquad = resolveSquad(squads, match?.teamBId, 1);
+
     return (
         <ScrollView style={[styles.tabContent, { backgroundColor: theme.background }]}>
-            {/* Series Section */}
+            {/* Series */}
             <Card style={[styles.tabCard, { borderColor: theme.border }]}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
                     <ThemedText variant="subtitle" weight="bold">Series</ThemedText>
                     {match?.seriesId && (
                         <TouchableOpacity onPress={() => navigation.navigate('SeriesDetail', { seriesId: match.seriesId._id })}>
-                            <ThemedText color="primary" weight="bold" variant="small">View Series {`>`}</ThemedText>
+                            <ThemedText color="primary" weight="bold" variant="small">View Series {'>'}</ThemedText>
                         </TouchableOpacity>
                     )}
                 </View>
@@ -96,13 +154,13 @@ const InfoTab = ({ match, onTeamPress }: { match: any, onTeamPress: (team: 'WP' 
                 <View style={[styles.infoRow, { borderBottomColor: theme.border + '50' }]}>
                     <ThemedText color="textSecondary" style={styles.infoLabel}>Match</ThemedText>
                     <ThemedText weight="medium" style={styles.infoValue}>
-                        {(match?.teamAId?.shortName || 'T1')} vs {(match?.teamBId?.shortName || 'T2')}, {match?.matchNumber || 'Match'}
+                        {(match?.teamAId?.shortName || 'T1')} vs {(match?.teamBId?.shortName || 'T2')}{match?.matchNumber ? `, ${match.matchNumber}` : ''}
                     </ThemedText>
                 </View>
                 <View style={[styles.infoRow, { borderBottomColor: theme.border + '50' }]}>
                     <ThemedText color="textSecondary" style={styles.infoLabel}>Date & Time</ThemedText>
                     <ThemedText weight="medium" style={styles.infoValue}>
-                        {match?.matchDate ? new Date(match.matchDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD'}, {match?.matchTime ? new Date(match.matchTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                        {match?.matchDate ? new Date(match.matchDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD'}{match?.matchTime ? ', ' + new Date(match.matchTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                     </ThemedText>
                 </View>
                 <View style={[styles.infoRow, { borderBottomColor: theme.border + '50' }]}>
@@ -117,62 +175,40 @@ const InfoTab = ({ match, onTeamPress }: { match: any, onTeamPress: (team: 'WP' 
                 </View>
             </Card>
 
-            {/* Playing XI */}
+            {/* Squad — tap to open modal */}
             <Card style={[styles.tabCard, { borderColor: theme.border }]}>
-                <ThemedText variant="subtitle" weight="bold" style={[styles.cardTitle, { borderBottomColor: theme.border }]}>Playing XI</ThemedText>
-                <View style={{ gap: spacing.md }}>
-                    <TouchableOpacity
-                        style={[styles.teamSelectorRow, { backgroundColor: isDark ? theme.surface : theme.borderLight }]}
-                        onPress={() => onTeamPress('WP')}
-                    >
-                        <View style={styles.teamLogoBadgeSmall}>
-                            {match?.teamAId?.logo ? <Image source={{ uri: match.teamAId.logo }} style={{ width: 20, height: 20 }} /> : <Ionicons name="shirt-outline" size={16} color={theme.textSecondary} />}
-                        </View>
-                        <ThemedText weight="bold" style={{ flex: 1 }}>{match?.teamAId?.name || 'Team A'}</ThemedText>
-                        <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.teamSelectorRow, { backgroundColor: isDark ? theme.surface : theme.borderLight }]}
-                        onPress={() => onTeamPress('LIO')}
-                    >
-                        <View style={styles.teamLogoBadgeSmall}>
-                            {match?.teamBId?.logo ? <Image source={{ uri: match.teamBId.logo }} style={{ width: 20, height: 20 }} /> : <Ionicons name="shirt-outline" size={16} color={theme.textSecondary} />}
-                        </View>
-                        <ThemedText weight="bold" style={{ flex: 1 }}>{match?.teamBId?.name || 'Team B'}</ThemedText>
-                        <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
-                    </TouchableOpacity>
+                <ThemedText variant="subtitle" weight="bold" style={[styles.cardTitle, { borderBottomColor: theme.border }]}>Squads</ThemedText>
+                <View style={{ gap: spacing.sm }}>
+                    <TeamSquadButton squad={teamASquad} team={match?.teamAId} teamIndex={0} onPress={onTeamPress} isDark={isDark} theme={theme} />
+                    <TeamSquadButton squad={teamBSquad} team={match?.teamBId} teamIndex={1} onPress={onTeamPress} isDark={isDark} theme={theme} />
                 </View>
             </Card>
 
             {/* Head to Head */}
             <Card style={[styles.tabCard, { borderColor: theme.border }]}>
                 <ThemedText variant="subtitle" weight="bold" style={[styles.cardTitle, { borderBottomColor: theme.border }]}>Head to Head</ThemedText>
-                <View style={styles.h2hContainer}>
-                    <View style={styles.h2hStatRow}>
-                        <View style={styles.h2hTeamInfo}>
-                            <ThemedText weight="bold">WP</ThemedText>
-                            <ThemedText color="primary" variant="title" weight="bold">{H2H_DATA.team1Wins}</ThemedText>
-                        </View>
-                        <View style={styles.h2hDivider}>
-                            <ThemedText variant="small" color="textSecondary">TOT: {H2H_DATA.total}</ThemedText>
-                            <View style={styles.h2hProgressContainer}>
-                                <View style={[styles.h2hProgressBar, { width: `${(H2H_DATA.team1Wins / H2H_DATA.total) * 100}%`, backgroundColor: theme.primary }]} />
+                {match?.headToHead ? (
+                    <View style={styles.h2hContainer}>
+                        <View style={styles.h2hStatRow}>
+                            <View style={styles.h2hTeamInfo}>
+                                <ThemedText weight="bold">{match?.teamAId?.shortName || 'T1'}</ThemedText>
+                                <ThemedText color="primary" variant="title" weight="bold">{match.headToHead.team1Wins || 0}</ThemedText>
+                            </View>
+                            <View style={styles.h2hDivider}>
+                                <ThemedText variant="small" color="textSecondary">TOT: {(match.headToHead.team1Wins || 0) + (match.headToHead.team2Wins || 0)}</ThemedText>
+                                <View style={styles.h2hProgressContainer}>
+                                    <View style={[styles.h2hProgressBar, { width: `${((match.headToHead.team1Wins || 0) / Math.max(1, (match.headToHead.team1Wins || 0) + (match.headToHead.team2Wins || 0))) * 100}%`, backgroundColor: theme.primary }]} />
+                                </View>
+                            </View>
+                            <View style={[styles.h2hTeamInfo, { alignItems: 'flex-end' }]}>
+                                <ThemedText weight="bold">{match?.teamBId?.shortName || 'T2'}</ThemedText>
+                                <ThemedText color="textSecondary" variant="title" weight="bold">{match.headToHead.team2Wins || 0}</ThemedText>
                             </View>
                         </View>
-                        <View style={[styles.h2hTeamInfo, { alignItems: 'flex-end' }]}>
-                            <ThemedText weight="bold">LIO</ThemedText>
-                            <ThemedText color="textSecondary" variant="title" weight="bold">{H2H_DATA.team2Wins}</ThemedText>
-                        </View>
                     </View>
-                    <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'center', marginTop: spacing.md }}>
-                        {H2H_DATA.lastFive.map((winner, i) => (
-                            <View key={i} style={[styles.h2hBadge, { backgroundColor: winner === 'WP' ? theme.primary : theme.textSecondary }]}>
-                                <ThemedText color="white" weight="bold" variant="caption">{winner}</ThemedText>
-                            </View>
-                        ))}
-                    </View>
-                </View>
+                ) : (
+                    <ThemedText color="textSecondary" style={{ textAlign: 'center', paddingVertical: spacing.md }}>H2H record not yet available.</ThemedText>
+                )}
             </Card>
 
             <View style={{ height: 20 }} />
@@ -180,57 +216,130 @@ const InfoTab = ({ match, onTeamPress }: { match: any, onTeamPress: (team: 'WP' 
     );
 };
 
-const CommentaryTab = () => {
-    const { theme } = useTheme();
+
+const CommentaryTab = ({ matchId, commentary: socketCommentary }: { matchId: string, commentary: any[] }) => {
+    const { theme, isDark } = useTheme();
+    const [allCommentary, setAllCommentary] = useState<any[]>([]);
+
+    // Fetch initial recent overs from REST on mount
+    const { data: recentOvers } = useFetch(
+        () => MatchService.getRecentOvers(matchId),
+        [matchId]
+    );
+
+    // Seed commentary from REST data on first load
+    useEffect(() => {
+        if (recentOvers?.overs) {
+            const balls: any[] = [];
+            [...(recentOvers.overs)].reverse().forEach((over: any) => {
+                if (over.ballsData) {
+                    [...over.ballsData].reverse().forEach((ball: any) => {
+                        balls.push({
+                            over: `${over.overNumber - 1}.${ball.ballNumber || '?'}`,
+                            commentary: ball.commentary || '',
+                            type: ball.type || 'ball',
+                            bowlerName: ball.bowlerName || over.bowlerId?.name || '',
+                            batsmanName: ball.batsmanName || '',
+                            isWicket: ball.type === 'wicket',
+                        });
+                    });
+                }
+            });
+            setAllCommentary(balls);
+        }
+    }, [recentOvers]);
+
+    // Merge live socket commentary (newest first)
+    useEffect(() => {
+        if (socketCommentary.length > 0) {
+            setAllCommentary((prev) => {
+                // Add only those not already present (by over+ball combo or just prepend)
+                return [...socketCommentary, ...prev].slice(0, 100);
+            });
+        }
+    }, [socketCommentary]);
+
+    const getBallBg = (item: any) => {
+        if (item.isWicket) return '#ef4444';
+        if (item.isSix) return '#7c3aed';
+        if (item.isBoundary) return '#0e7490';
+        return isDark ? theme.surface : theme.borderLight;
+    };
+
     return (
         <ScrollView style={[styles.tabContent, { backgroundColor: theme.background }]}>
-            <View style={styles.commentaryItem}>
-                <View style={styles.overColumn}>
-                    <ThemedText weight="bold">45.2</ThemedText>
+            {allCommentary.length === 0 && (
+                <View style={{ padding: spacing.xl, alignItems: 'center' }}>
+                    <Ionicons name="chatbubbles-outline" size={48} color={theme.textSecondary} />
+                    <ThemedText color="textSecondary" style={{ marginTop: spacing.md, textAlign: 'center' }}>
+                        No commentary yet. Commentary will appear here once the match is live.
+                    </ThemedText>
                 </View>
-                <View style={styles.commentaryText}>
-                    <ThemedText>Cummins to Rahul, <ThemedText weight="bold">SIX</ThemedText>, what a shot! That's out of the ground.</ThemedText>
+            )}
+            {allCommentary.map((item: any, idx: number) => (
+                <View
+                    key={idx}
+                    style={[
+                        styles.commentaryItem,
+                        {
+                            borderBottomColor: theme.border + '50',
+                            backgroundColor: item.isWicket ? '#ef444415' : 'transparent'
+                        }
+                    ]}
+                >
+                    <View style={[styles.overColumn, { alignItems: 'center' }]}>
+                        <View style={[
+                            styles.overBall,
+                            { backgroundColor: getBallBg(item), width: 36, height: 36, borderRadius: 18 }
+                        ]}>
+                            <ThemedText
+                                weight="bold"
+                                variant="small"
+                                color={item.isWicket || item.isSix || item.isBoundary ? 'white' : 'text'}
+                            >
+                                {item.over || '-'}
+                            </ThemedText>
+                        </View>
+                    </View>
+                    <View style={styles.commentaryText}>
+                        {item.bowlerName ? (
+                            <ThemedText variant="small" color="textSecondary">
+                                {item.bowlerName}{item.batsmanName ? ` to ${item.batsmanName}` : ''}
+                            </ThemedText>
+                        ) : null}
+                        <ThemedText>{item.commentary || item.commentaryText || 'Ball delivered'}</ThemedText>
+                    </View>
                 </View>
-            </View>
-            <View style={styles.commentaryItem}>
-                <View style={styles.overColumn}>
-                    <ThemedText weight="bold">45.1</ThemedText>
-                </View>
-                <View style={styles.commentaryText}>
-                    <ThemedText>Cummins to Rahul, 2 runs, clipped away to deep mid-wicket for a couple.</ThemedText>
-                </View>
-            </View>
+            ))}
+            <View style={{ height: 40 }} />
         </ScrollView>
     );
 };
 
-const ScorecardTab = () => {
+const ScorecardTab = ({ matchId, liveStatus, match }: { matchId: string, liveStatus: any, match: any }) => {
     const { theme, isDark } = useTheme();
     const [activeInnings, setActiveInnings] = useState(1);
 
-    const INNINGS_DATA = [
-        { id: 1, label: 'WP 1st Inn', score: '325/10' },
-        { id: 2, label: 'LIO 1st Inn', score: '280/10' },
-        { id: 3, label: 'WP 2nd Inn', score: '150/4' },
-        { id: 4, label: 'LIO 2nd Inn', score: 'Yet to bat' },
-    ];
+    const { data: scorecardData, loading, error } = useFetch(
+        () => MatchService.getScorecard(matchId, activeInnings),
+        [matchId, activeInnings]
+    );
 
-    const batting = [
-        { name: 'Tony de Zorzi', status: 'c Williams b Rabada', runs: 112, balls: 145, fours: 12, sixes: 2, sr: 77.24 },
-        { name: 'Kyle Verreynne', status: 'b Sipamla', runs: 85, balls: 110, fours: 8, sixes: 1, sr: 77.27 },
-        { name: 'George Linde', status: 'not out', runs: 45, balls: 60, fours: 4, sixes: 1, sr: 75.00 },
-    ];
+    const inningsList = useMemo(() => {
+        const innArray = liveStatus?.innings || match?.liveStatus?.innings || [];
+        if (innArray.length === 0) {
+            return [{ id: 1, label: '1st Innings', score: '0/0' }];
+        }
+        return innArray.map((inn: any, idx: number) => ({
+            id: idx + 1,
+            label: inn.battingTeamId?.shortName ? `${inn.battingTeamId.shortName} ${idx + 1}st Inn` : `Innings ${idx + 1}`,
+            score: `${inn.totalRuns || 0}/${inn.totalWickets || 0}`
+        }));
+    }, [liveStatus, match]);
 
-    const bowling = [
-        { name: 'Kagiso Rabada', overs: '22', maidens: '4', runs: '75', wickets: '3', economy: '3.40' },
-        { name: 'Lizaad Williams', overs: '18', maidens: '2', runs: '68', wickets: '2', economy: '3.77' },
-        { name: 'L Sipamla', overs: '15', maidens: '1', runs: '55', wickets: '2', economy: '3.66' },
-    ];
-
-    const partnerships = [
-        { p1: { name: 'De Zorzi', runs: 65 }, p2: { name: 'Verreynne', runs: 45 }, total: 110, balls: 160 },
-        { p1: { name: 'Verreynne', runs: 20 }, p2: { name: 'Linde', runs: 30 }, total: 50, balls: 85 },
-    ];
+    const batting = useMemo(() => scorecardData?.batting || [], [scorecardData]);
+    const bowling = useMemo(() => scorecardData?.bowling || [], [scorecardData]);
+    const partnerships = useMemo(() => scorecardData?.partnerships || [], [scorecardData]);
 
     return (
         <ScrollView style={[styles.tabContent, { backgroundColor: theme.background }]}>
@@ -240,7 +349,7 @@ const ScorecardTab = () => {
                 style={styles.inningsSelectors}
                 contentContainerStyle={{ paddingHorizontal: spacing.sm }}
             >
-                {INNINGS_DATA.map((inn) => (
+                {inningsList.map((inn: any) => (
                     <TouchableOpacity
                         key={inn.id}
                         style={[
@@ -267,17 +376,20 @@ const ScorecardTab = () => {
                         <ThemedText variant="small" weight="bold" style={styles.colStat}>6s</ThemedText>
                     </View>
                 </View>
-                {batting.map((player, idx) => (
+                {batting.length === 0 && !loading && (
+                    <ThemedText style={{ padding: spacing.md, textAlign: 'center' }} color="textSecondary">No batting records found.</ThemedText>
+                )}
+                {batting.map((player: any, idx: number) => (
                     <View key={idx} style={styles.playerRow}>
                         <View style={styles.playerNameCol}>
-                            <ThemedText weight="semibold" style={{ color: theme.primary }}>{player.name}</ThemedText>
-                            <ThemedText variant="caption" color="textSecondary">{player.status}</ThemedText>
+                            <ThemedText weight="semibold" style={{ color: theme.primary }}>{player.playerName || player.playerId?.name || 'Unknown'}</ThemedText>
+                            <ThemedText variant="caption" color="textSecondary">{player.dismissalText || 'not out'}</ThemedText>
                         </View>
                         <View style={styles.scoreCols}>
-                            <ThemedText weight="bold" style={styles.colStat}>{player.runs}</ThemedText>
-                            <ThemedText variant="small" style={styles.colStat}>{player.balls}</ThemedText>
-                            <ThemedText variant="small" style={styles.colStat}>{player.fours}</ThemedText>
-                            <ThemedText variant="small" style={styles.colStat}>{player.sixes}</ThemedText>
+                            <ThemedText weight="bold" style={styles.colStat}>{player.runs || 0}</ThemedText>
+                            <ThemedText variant="small" style={styles.colStat}>{player.balls || 0}</ThemedText>
+                            <ThemedText variant="small" style={styles.colStat}>{player.fours || 0}</ThemedText>
+                            <ThemedText variant="small" style={styles.colStat}>{player.sixes || 0}</ThemedText>
                         </View>
                     </View>
                 ))}
@@ -293,14 +405,17 @@ const ScorecardTab = () => {
                         <ThemedText variant="small" weight="bold" style={styles.colStat}>W</ThemedText>
                     </View>
                 </View>
-                {bowling.map((bowler, idx) => (
+                {bowling.length === 0 && !loading && (
+                    <ThemedText style={{ padding: spacing.md, textAlign: 'center' }} color="textSecondary">No bowling records found.</ThemedText>
+                )}
+                {bowling.map((bowler: any, idx: number) => (
                     <View key={idx} style={styles.playerRow}>
-                        <ThemedText weight="semibold" style={[styles.playerNameCol, { color: theme.text }]}>{bowler.name}</ThemedText>
+                        <ThemedText weight="semibold" style={[styles.playerNameCol, { color: theme.text }]}>{bowler.playerName || bowler.playerId?.name || 'Unknown'}</ThemedText>
                         <View style={styles.scoreCols}>
-                            <ThemedText variant="small" style={styles.colStat}>{bowler.overs}</ThemedText>
-                            <ThemedText variant="small" style={styles.colStat}>{bowler.maidens}</ThemedText>
-                            <ThemedText variant="small" style={styles.colStat}>{bowler.runs}</ThemedText>
-                            <ThemedText weight="bold" style={styles.colStat}>{bowler.wickets}</ThemedText>
+                            <ThemedText variant="small" style={styles.colStat}>{bowler.overs || '0.0'}</ThemedText>
+                            <ThemedText variant="small" style={styles.colStat}>{bowler.maidens || 0}</ThemedText>
+                            <ThemedText variant="small" style={styles.colStat}>{bowler.runs || 0}</ThemedText>
+                            <ThemedText weight="bold" style={styles.colStat}>{bowler.wickets || 0}</ThemedText>
                         </View>
                     </View>
                 ))}
@@ -309,22 +424,29 @@ const ScorecardTab = () => {
             {/* Partnerships Section */}
             <Card style={styles.tabCard}>
                 <ThemedText variant="subtitle" weight="bold" style={styles.cardTitle}>Partnerships</ThemedText>
-                {partnerships.map((part, idx) => {
-                    const p1Pct = (part.p1.runs / part.total) * 100;
+                {partnerships.length === 0 && !loading && (
+                    <ThemedText style={{ padding: spacing.md, textAlign: 'center' }} color="textSecondary">No partnership records found.</ThemedText>
+                )}
+                {partnerships.map((part: any, idx: number) => {
+                    const p1Runs = part.batsman1Runs || 0;
+                    const p2Runs = part.batsman2Runs || 0;
+                    const totalRuns = part.runs || 0;
+                    const p1Pct = totalRuns > 0 ? (p1Runs / totalRuns) * 100 : 50;
+
                     return (
                         <View key={idx} style={{ marginBottom: spacing.md }}>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
                                 <View>
-                                    <ThemedText variant="small" weight="bold">{part.p1.name}</ThemedText>
-                                    <ThemedText variant="caption" color="textSecondary">{part.p1.runs} ({p1Pct.toFixed(0)}%)</ThemedText>
+                                    <ThemedText variant="small" weight="bold">{part.batsman1Id?.shortName || part.batsman1Name || 'Batsman 1'}</ThemedText>
+                                    <ThemedText variant="caption" color="textSecondary">{p1Runs} ({p1Pct.toFixed(0)}%)</ThemedText>
                                 </View>
                                 <View style={{ alignItems: 'center' }}>
-                                    <ThemedText weight="bold">{part.total}</ThemedText>
-                                    <ThemedText variant="caption" color="textSecondary">{part.balls} balls</ThemedText>
+                                    <ThemedText weight="bold">{totalRuns}</ThemedText>
+                                    <ThemedText variant="caption" color="textSecondary">{part.balls || 0} balls</ThemedText>
                                 </View>
                                 <View style={{ alignItems: 'flex-end' }}>
-                                    <ThemedText variant="small" weight="bold">{part.p2.name}</ThemedText>
-                                    <ThemedText variant="caption" color="textSecondary">{part.p2.runs} ({(100 - p1Pct).toFixed(0)}%)</ThemedText>
+                                    <ThemedText variant="small" weight="bold">{part.batsman2Id?.shortName || part.batsman2Name || 'Batsman 2'}</ThemedText>
+                                    <ThemedText variant="caption" color="textSecondary">{p2Runs} ({(100 - p1Pct).toFixed(0)}%)</ThemedText>
                                 </View>
                             </View>
                             <View style={[styles.partnershipBar, { backgroundColor: isDark ? theme.border : theme.borderLight }]}>
@@ -349,7 +471,7 @@ const ScoreSummaryHeader = ({ liveStatus, match }: { liveStatus: any, match: any
     const score = liveStatus?.score || '0-0';
     const overs = liveStatus?.overs || '0.0';
     const crr = liveStatus?.runRate || '0.00';
-    const toss = liveStatus?.toss || match?.toss?.tossText || 'Toss Pending';
+    const toss = liveStatus?.toss?.tossText || liveStatus?.toss || match?.toss?.tossText || 'Toss Pending';
 
     return (
         <View style={[styles.liveScoreSection, { backgroundColor: headerBg }]}>
@@ -443,19 +565,13 @@ const LiveTab = ({ navigation, matchId, liveStatus, ballData }: { navigation: Ma
 
                 <View style={styles.liveTeamHeader}>
                     <View style={styles.teamLabelRow}>
-                        <ThemedText weight="bold">Western Province</ThemedText>
+                        <ThemedText weight="bold">{liveStatus?.battingTeamId?.name || 'Batting Team'}</ThemedText>
                         <Ionicons name="information-circle-outline" size={14} color={theme.textSecondary} />
                     </View>
                     <View style={styles.teamScoreBadges}>
                         <View style={[styles.badgeLabel, { backgroundColor: theme.borderLight }]}>
-                            <ThemedText variant="small" weight="bold">WP</ThemedText>
+                            <ThemedText variant="small" weight="bold">{liveStatus?.battingTeamId?.shortName || '-'}</ThemedText>
                             <Ionicons name="flashlight" size={12} color={theme.primary} />
-                        </View>
-                        <View style={[styles.statValueBox, { backgroundColor: '#1d4ed8' }]}>
-                            <ThemedText variant="small" weight="bold" color="white">63</ThemedText>
-                        </View>
-                        <View style={[styles.statValueBox, { backgroundColor: '#991b1b' }]}>
-                            <ThemedText variant="small" weight="bold" color="white">70</ThemedText>
                         </View>
                     </View>
                 </View>
@@ -468,25 +584,31 @@ const LiveTab = ({ navigation, matchId, liveStatus, ballData }: { navigation: Ma
                         <ThemedText variant="caption" color="textSecondary" style={styles.colStatSmall}>6s</ThemedText>
                         <ThemedText variant="caption" color="textSecondary" style={styles.colStatSmall}>SR</ThemedText>
                     </View>
-                    <View style={[styles.tableRow, { borderBottomColor: theme.border }]}>
-                        <ThemedText weight="bold" style={styles.colBatter} color="primary">Tony de Zorzi</ThemedText>
-                        <ThemedText style={styles.colStatSmall}>47 (35)</ThemedText>
-                        <ThemedText style={styles.colStatSmall}>5</ThemedText>
-                        <ThemedText style={styles.colStatSmall}>2</ThemedText>
-                        <ThemedText style={styles.colStatSmall}>134.3</ThemedText>
-                        <Ionicons name="chevron-down" size={14} color={theme.textLight} />
-                    </View>
-                    <View style={[styles.tableRow, { borderBottomColor: theme.border }]}>
-                        <View style={[styles.colBatter, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
-                            <ThemedText weight="bold" color="primary">D Bedingham</ThemedText>
-                            <Ionicons name="flashlight" size={12} color="#facc15" />
+
+                    {liveStatus?.currentStrikerId ? (
+                        <View style={[styles.tableRow, { borderBottomColor: theme.border }]}>
+                            <View style={[styles.colBatter, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                                <ThemedText weight="bold" style={{ color: theme.primary }}>{liveStatus.currentStrikerId?.name || liveStatus.currentStrikerId?.shortName || 'Striker'}</ThemedText>
+                                <Ionicons name="caret-forward" size={12} color={theme.primary} />
+                            </View>
+                            <ThemedText style={styles.colStatSmall}>-</ThemedText>
+                            <ThemedText style={styles.colStatSmall}>-</ThemedText>
+                            <ThemedText style={styles.colStatSmall}>-</ThemedText>
+                            <ThemedText style={styles.colStatSmall}>-</ThemedText>
                         </View>
-                        <ThemedText style={styles.colStatSmall}>15 (11)</ThemedText>
-                        <ThemedText style={styles.colStatSmall}>3</ThemedText>
-                        <ThemedText style={styles.colStatSmall}>0</ThemedText>
-                        <ThemedText style={styles.colStatSmall}>136.4</ThemedText>
-                        <Ionicons name="chevron-down" size={14} color={theme.textLight} />
-                    </View>
+                    ) : (
+                        <ThemedText style={{ padding: spacing.sm, textAlign: 'center' }} color="textSecondary">No Striker Active</ThemedText>
+                    )}
+
+                    {liveStatus?.currentNonStrikerId && (
+                        <View style={[styles.tableRow, { borderBottomColor: theme.border }]}>
+                            <ThemedText weight="bold" style={styles.colBatter} color="textSecondary">{liveStatus.currentNonStrikerId?.name || liveStatus.currentNonStrikerId?.shortName || 'Non-Striker'}</ThemedText>
+                            <ThemedText style={styles.colStatSmall}>-</ThemedText>
+                            <ThemedText style={styles.colStatSmall}>-</ThemedText>
+                            <ThemedText style={styles.colStatSmall}>-</ThemedText>
+                            <ThemedText style={styles.colStatSmall}>-</ThemedText>
+                        </View>
+                    )}
                 </View>
 
                 <View style={[styles.partnershipStrip, { backgroundColor: isDark ? theme.surface : theme.borderLight }]}>
@@ -502,13 +624,17 @@ const LiveTab = ({ navigation, matchId, liveStatus, ballData }: { navigation: Ma
                         <ThemedText variant="caption" color="textSecondary" style={styles.colStatSmall}>Overs</ThemedText>
                         <ThemedText variant="caption" color="textSecondary" style={styles.colStatSmall}>Econ</ThemedText>
                     </View>
-                    <View style={[styles.tableRow, { borderBottomColor: theme.border }]}>
-                        <ThemedText weight="bold" style={styles.colBatter}>L Sipamla</ThemedText>
-                        <ThemedText style={styles.colStatSmall}>0-22</ThemedText>
-                        <ThemedText style={styles.colStatSmall}>1.5</ThemedText>
-                        <ThemedText style={styles.colStatSmall}>12.00</ThemedText>
-                        <Ionicons name="chevron-down" size={14} color={theme.textLight} />
-                    </View>
+
+                    {liveStatus?.currentBowlerId ? (
+                        <View style={[styles.tableRow, { borderBottomColor: theme.border }]}>
+                            <ThemedText weight="bold" style={styles.colBatter}>{liveStatus.currentBowlerId?.name || liveStatus.currentBowlerId?.shortName || 'Bowler'}</ThemedText>
+                            <ThemedText style={styles.colStatSmall}>-</ThemedText>
+                            <ThemedText style={styles.colStatSmall}>-</ThemedText>
+                            <ThemedText style={styles.colStatSmall}>-</ThemedText>
+                        </View>
+                    ) : (
+                        <ThemedText style={{ padding: spacing.sm, textAlign: 'center' }} color="textSecondary">No Bowler Active</ThemedText>
+                    )}
                 </View>
 
                 <View style={[styles.predictionSection, { backgroundColor: isDark ? theme.surface : theme.borderLight }]}>
@@ -517,8 +643,8 @@ const LiveTab = ({ navigation, matchId, liveStatus, ballData }: { navigation: Ma
                         <ThemedText color="textSecondary" variant="caption">Total Votes: 36,179</ThemedText>
                     </View>
                     <View style={styles.predictionButtonsRow}>
-                        <TouchableOpacity style={[styles.predButton, { backgroundColor: theme.background, borderColor: theme.border }]}><ThemedText weight="bold">WP</ThemedText></TouchableOpacity>
-                        <TouchableOpacity style={[styles.predButton, { backgroundColor: theme.background, borderColor: theme.border }]}><ThemedText weight="bold">LIO</ThemedText></TouchableOpacity>
+                        <TouchableOpacity style={[styles.predButton, { backgroundColor: theme.background, borderColor: theme.border }]}><ThemedText weight="bold">Team 1</ThemedText></TouchableOpacity>
+                        <TouchableOpacity style={[styles.predButton, { backgroundColor: theme.background, borderColor: theme.border }]}><ThemedText weight="bold">Team 2</ThemedText></TouchableOpacity>
                     </View>
                 </View>
 
@@ -740,13 +866,6 @@ const SERIES_STATS = {
     ],
 };
 
-const POINTS_TABLE_DATA = [
-    { rank: 1, team: 'LIO', played: 5, won: 4, lost: 1, nr: 0, nrr: '+1.245', cupR: 4, pts: 16, status: 'Q', trophy: true },
-    { rank: 2, team: 'WP', played: 5, won: 3, lost: 2, nr: 0, nrr: '+0.856', cupR: 3, pts: 12, status: 'Q' },
-    { rank: 3, team: 'DOL', played: 5, won: 2, lost: 2, nr: 1, nrr: '-0.124', cupR: 2, pts: 10 },
-    { rank: 4, team: 'TIT', played: 5, won: 2, lost: 3, nr: 0, nrr: '-0.450', cupR: 1, pts: 8, status: 'E' },
-    { rank: 5, team: 'WAR', played: 5, won: 1, lost: 4, nr: 0, nrr: '-1.200', cupR: 0, pts: 4, status: 'E' },
-];
 
 // --- Tab Components ---
 
@@ -860,8 +979,33 @@ const GraphsTab = () => {
     );
 };
 
-const PointsTableTab = () => {
+const PointsTableTab = ({ seriesId }: { seriesId: string }) => {
     const { theme, isDark } = useTheme();
+
+    const { data: pointsTable, loading } = useFetch(
+        () => seriesId ? MatchService.getPointsTable(seriesId) : Promise.resolve([]),
+        [seriesId]
+    );
+
+    if (loading) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl }}>
+                <ThemedText color="textSecondary">Loading standings...</ThemedText>
+            </View>
+        );
+    }
+
+    if (!seriesId || !pointsTable || pointsTable.length === 0) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl }}>
+                <Ionicons name="stats-chart-outline" size={48} color={theme.textSecondary} />
+                <ThemedText color="textSecondary" style={{ marginTop: spacing.md, textAlign: 'center' }}>
+                    Points table not available for this series.
+                </ThemedText>
+            </View>
+        );
+    }
+
     return (
         <ScrollView style={[styles.tabContent, { backgroundColor: theme.background }]}>
             <Card style={styles.tabCard}>
@@ -872,12 +1016,6 @@ const PointsTableTab = () => {
                         </View>
                         <ThemedText variant="caption" color="textSecondary">Qualified</ThemedText>
                     </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: '#ef4444', alignItems: 'center', justifyContent: 'center' }}>
-                            <ThemedText color="white" style={{ fontSize: 8 }}>E</ThemedText>
-                        </View>
-                        <ThemedText variant="caption" color="textSecondary">Eliminated</ThemedText>
-                    </View>
                 </View>
 
                 <View style={[styles.pointsTableHeader, { borderBottomColor: theme.border }]}>
@@ -886,52 +1024,54 @@ const PointsTableTab = () => {
                     <ThemedText variant="small" weight="bold" style={styles.colStatMini}>P</ThemedText>
                     <ThemedText variant="small" weight="bold" style={styles.colStatMini}>W</ThemedText>
                     <ThemedText variant="small" weight="bold" style={styles.colStatMini}>L</ThemedText>
-                    <ThemedText variant="small" weight="bold" style={styles.colStatMini}>NR</ThemedText>
+                    <ThemedText variant="small" weight="bold" style={styles.colStatMini}>T/NR</ThemedText>
                     <ThemedText variant="small" weight="bold" style={styles.colNrrCompact}>NRR</ThemedText>
-                    <ThemedText variant="small" weight="bold" style={styles.colCupRCompact}>CupR</ThemedText>
                     <ThemedText variant="small" weight="bold" style={styles.colStatMini}>PTS</ThemedText>
                 </View>
-                {POINTS_TABLE_DATA.map((item, idx) => (
-                    <View key={idx} style={[styles.pointsTableRow, { borderBottomColor: theme.border + '50' }]}>
-                        <View style={styles.colRank}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                                <ThemedText style={{ fontSize: 11, fontWeight: 'bold' }}>{item.rank}</ThemedText>
-                                {item.status && (
-                                    <View style={{
-                                        width: 12,
-                                        height: 12,
-                                        borderRadius: 6,
-                                        backgroundColor: item.status === 'Q' ? '#22c55e' : '#ef4444',
-                                        alignItems: 'center',
-                                        justifyContent: 'center'
-                                    }}>
-                                        <ThemedText color="white" style={{ fontSize: 7, fontWeight: 'bold' }}>{item.status}</ThemedText>
-                                    </View>
-                                )}
+                {pointsTable.map((item: any, idx: number) => {
+                    const team = item.teamId;
+                    const nrr = Number(item.netRunRate || 0).toFixed(3);
+                    const nrrPrefix = Number(nrr) > 0 ? '+' : '';
+
+                    return (
+                        <View key={idx} style={[styles.pointsTableRow, { borderBottomColor: theme.border + '50' }]}>
+                            <View style={styles.colRank}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                                    <ThemedText style={{ fontSize: 11, fontWeight: 'bold' }}>{item.position || idx + 1}</ThemedText>
+                                    {item.qualify && (
+                                        <View style={{
+                                            width: 12,
+                                            height: 12,
+                                            borderRadius: 6,
+                                            backgroundColor: '#22c55e',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                        }}>
+                                            <ThemedText color="white" style={{ fontSize: 7, fontWeight: 'bold' }}>Q</ThemedText>
+                                        </View>
+                                    )}
+                                </View>
                             </View>
-                        </View>
-                        <View style={[styles.colTeam, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
-                            <View style={[styles.teamLogoBadgeSmall, { width: 18, height: 18 }]}>
-                                <ThemedText weight="bold" style={{ fontSize: 8 }}>{item.team[0]}</ThemedText>
+                            <View style={[styles.colTeam, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                                <View style={[styles.teamLogoBadgeSmall, { width: 18, height: 18 }]}>
+                                    {team?.logo
+                                        ? <Image source={{ uri: team.logo }} style={{ width: 14, height: 14 }} />
+                                        : <ThemedText weight="bold" style={{ fontSize: 8 }}>{team?.shortName?.[0] || 'T'}</ThemedText>
+                                    }
+                                </View>
+                                <ThemedText style={{ fontSize: 11, fontWeight: 'bold' }}>{team?.shortName || team?.name || 'Team'}</ThemedText>
                             </View>
-                            <ThemedText style={{ fontSize: 11, fontWeight: 'bold' }}>{item.team}</ThemedText>
+                            <ThemedText style={styles.colStatMiniText}>{item.played || 0}</ThemedText>
+                            <ThemedText style={styles.colStatMiniText}>{item.won || 0}</ThemedText>
+                            <ThemedText style={styles.colStatMiniText}>{item.lost || 0}</ThemedText>
+                            <ThemedText style={styles.colStatMiniText}>{(item.tied || 0) + (item.noResult || 0)}</ThemedText>
+                            <ThemedText style={[styles.colNrrCompactText, { color: Number(nrr) > 0 ? '#22c55e' : theme.textSecondary }]}>
+                                {nrrPrefix}{nrr}
+                            </ThemedText>
+                            <ThemedText style={[styles.colStatMiniText, { color: theme.primary, fontWeight: 'bold' }]}>{item.points || 0}</ThemedText>
                         </View>
-                        <ThemedText style={styles.colStatMiniText}>{item.played}</ThemedText>
-                        <ThemedText style={styles.colStatMiniText}>{item.won}</ThemedText>
-                        <ThemedText style={styles.colStatMiniText}>{item.lost}</ThemedText>
-                        <ThemedText style={styles.colStatMiniText}>{item.nr}</ThemedText>
-                        <ThemedText style={[styles.colNrrCompactText, { color: item.nrr.startsWith('+') ? theme.primary : theme.textSecondary }]}>{item.nrr}</ThemedText>
-                        <View style={styles.colCupRCompact}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                                <ThemedText style={{ fontSize: 10, fontWeight: 'bold' }}>{item.cupR}</ThemedText>
-                                {item.trophy && (
-                                    <Ionicons name="trophy" size={10} color="#f59e0b" />
-                                )}
-                            </View>
-                        </View>
-                        <ThemedText style={[styles.colStatMiniText, { color: theme.primary, fontWeight: 'bold' }]}>{item.pts}</ThemedText>
-                    </View>
-                ))}
+                    );
+                })}
             </Card>
         </ScrollView>
     );
@@ -940,6 +1080,7 @@ const PointsTableTab = () => {
 // --- Main Screen ---
 
 export const MatchDetailScreen: React.FC = () => {
+    const insets = useSafeAreaInsets();
     const { theme, isDark } = useTheme();
     const navigation = useNavigation<MatchDetailNavigationProp>();
     const route = useRoute<RouteProp<RootStackParamList, 'MatchDetails'>>();
@@ -951,18 +1092,56 @@ export const MatchDetailScreen: React.FC = () => {
         [matchId]
     );
 
+    // DEBUG: Log full match object when it loads
+    useEffect(() => {
+        if (match) {
+            console.log('\n===== [MatchDetailScreen] MATCH DETAILS LOADED =====');
+            console.log('[match] Full Object:', JSON.stringify(match, null, 2));
+            console.log('[match.seriesId]:', JSON.stringify(match.seriesId));
+            console.log('[match.venueId]:', JSON.stringify(match.venueId));
+            console.log('[match.teamAId]:', JSON.stringify(match.teamAId));
+            console.log('[match.teamBId]:', JSON.stringify(match.teamBId));
+            console.log('[match.toss]:', JSON.stringify(match.toss));
+            console.log('[match.headToHead]:', JSON.stringify(match.headToHead));
+            console.log('[match.matchDate]:', match.matchDate);
+            console.log('[match.status]:', match.status);
+            console.log('[match.matchFormat]:', match.matchFormat);
+            console.log('====================================================\n');
+        }
+    }, [match]);
+
     // Live socket data
-    const { matchStatus, ballData, isConnected } = useLiveMatch(matchId);
+    const { matchStatus, ballData, commentary, isConnected } = useLiveMatch(matchId);
 
     // Initial live status from REST (until socket takes over or as a base)
-    const { data: initialLiveStatus } = useFetch(
+    const { data: initialLiveStatus, loading: loadingStatus } = useFetch(
         () => MatchService.getLiveStatus(matchId),
         [matchId]
     );
 
+    // DEBUG: Log full liveStatus when it loads
+    useEffect(() => {
+        if (initialLiveStatus) {
+            console.log('\n===== [MatchDetailScreen] LIVE STATUS LOADED =====');
+            console.log('[liveStatus] Full Object:', JSON.stringify(initialLiveStatus, null, 2));
+            console.log('[liveStatus.innings]:', JSON.stringify(initialLiveStatus.innings));
+            console.log('[liveStatus.currentStrikerId]:', JSON.stringify(initialLiveStatus.currentStrikerId));
+            console.log('[liveStatus.currentBowlerId]:', JSON.stringify(initialLiveStatus.currentBowlerId));
+            console.log('[liveStatus.battingTeamId]:', JSON.stringify(initialLiveStatus.battingTeamId));
+            console.log('===================================================\n');
+        }
+    }, [initialLiveStatus]);
+
+    // Squads — fetched once to power InfoTab + bottom sheet
+    const { data: squadsData } = useFetch(
+        () => MatchService.getSquads(matchId),
+        [matchId]
+    );
+    const squads: any[] = squadsData || [];
+
     const liveStatus = matchStatus || initialLiveStatus;
 
-    const [selectedTeam, setSelectedTeam] = useState<'WP' | 'LIO' | null>(null);
+    const [selectedTeamIndex, setSelectedTeamIndex] = useState<0 | 1 | null>(null);
     const [sheetType, setSheetType] = useState<'squad' | 'fantasy-all' | 'analysis'>('squad');
     const [analysisTab, setAnalysisTab] = useState('mostRuns');
 
@@ -972,9 +1151,9 @@ export const MatchDetailScreen: React.FC = () => {
         return ['50%', '80%'];
     }, [sheetType]);
 
-    const handleTeamPress = useCallback((team: 'WP' | 'LIO') => {
+    const handleTeamPress = useCallback((teamIndex: 0 | 1) => {
         setSheetType('squad');
-        setSelectedTeam(team);
+        setSelectedTeamIndex(teamIndex);
         bottomSheetRef.current?.expand();
     }, []);
 
@@ -994,55 +1173,98 @@ export const MatchDetailScreen: React.FC = () => {
         []
     );
 
-    const team1Name = match?.teamAId?.name || match?.teamA?.name || 'Team 1';
-    const team2Name = match?.teamBId?.name || match?.teamB?.name || 'Team 2';
-    const team1Code = match?.teamAId?.shortName || match?.teamAId?.code || 'T1';
-    const team2Code = match?.teamBId?.shortName || match?.teamBId?.code || 'T2';
+    const team1Name = match?.teamAId?.name || match?.teamA?.name || route.params?.team1Name || 'Team 1';
+    const team2Name = match?.teamBId?.name || match?.teamB?.name || route.params?.team2Name || 'Team 2';
+    const team1Code = match?.teamAId?.shortName || match?.teamAId?.code || route.params?.team1Name || 'T1';
+    const team2Code = match?.teamBId?.shortName || match?.teamBId?.code || route.params?.team2Name || 'T2';
 
-    const squad = selectedTeam === 'WP' ? SQUAD_DATA.WP : SQUAD_DATA.LIO; // still mock squad for now
+    // ─── Squad Logic ───────────────────────────────────────────────────────────
 
-    const groupedSquad = useMemo(() => {
-        const groups: { [key: string]: { name: string; role: string }[] } = {
+    // selectedTeamObj needed for both InfoTab and BottomSheet memo
+    const selectedTeamObj = useMemo(() =>
+        selectedTeamIndex === 0 ? match?.teamAId : match?.teamBId,
+        [selectedTeamIndex, match]);
+
+    // Real squad for the selected team (for BottomSheet)
+    const selectedSquad = useMemo(() =>
+        resolveSquad(squads, selectedTeamObj, selectedTeamIndex ?? 0),
+        [squads, selectedTeamObj, selectedTeamIndex]);
+
+    const groupPlayers = (players: any[]) => {
+        const groups: { [key: string]: any[] } = {
             'Batters': [],
             'Wicket-keepers': [],
             'All-rounders': [],
             'Bowlers': []
         };
-
-        squad.forEach(player => {
-            if (player.role.includes('Batter') && !player.role.includes('WK')) groups['Batters'].push(player);
-            else if (player.role.includes('WK')) groups['Wicket-keepers'].push(player);
-            else if (player.role.includes('All-rounder')) groups['All-rounders'].push(player);
-            else if (player.role.includes('Bowler')) groups['Bowlers'].push(player);
+        players.forEach(player => {
+            const role = (player.role || '').toLowerCase();
+            if (role.includes('wicket')) groups['Wicket-keepers'].push(player);
+            else if (role.includes('all')) groups['All-rounders'].push(player);
+            else if (role.includes('bowl')) groups['Bowlers'].push(player);
+            else groups['Batters'].push(player);
         });
-
         return groups;
-    }, [squad, selectedTeam]);
+    };
+
+    const squadGroups = useMemo(() => ({
+        playingXI: groupPlayers(selectedSquad?.playingXI || []),
+        bench: groupPlayers(selectedSquad?.bench || []),
+    }), [selectedSquad]);
+
+    // ─── Memoized Tabs to prevent 'stale' route error ─────────────────────────
+    const infoTab = useMemo(() => (
+        <InfoTab match={match} matchId={matchId} squads={squads} onTeamPress={handleTeamPress} />
+    ), [match, matchId, squads, handleTeamPress]);
+
+    const liveTab = useMemo(() => (
+        <View style={{ flex: 1 }}>
+            <ScoreSummaryHeader liveStatus={liveStatus} match={match} />
+            <LiveTab navigation={navigation} matchId={matchId} liveStatus={liveStatus} ballData={ballData} />
+        </View>
+    ), [liveStatus, match, navigation, matchId, ballData]);
+
+    const fantasyTab = useMemo(() => (
+        <FantasyTab onViewAll={handleFantasyViewAll} onAnalysis={handleAnalysisPress} />
+    ), [handleFantasyViewAll, handleAnalysisPress]);
+
+    const commentaryTab = useMemo(() => (
+        <CommentaryTab matchId={matchId} commentary={commentary} />
+    ), [matchId, commentary]);
+
+    const scorecardTab = useMemo(() => (
+        <ScorecardTab matchId={matchId} liveStatus={liveStatus} match={match} />
+    ), [matchId, liveStatus, match]);
+
+    const pointsTab = useMemo(() => (
+        <PointsTableTab seriesId={match?.seriesId?._id} />
+    ), [match?.seriesId?._id]);
+
+    // ─── Skeleton while match data loads ────────────────────────────────────────
+    if (loadingMatch || loadingStatus || !match) {
+        return <MatchDetailSkeleton onBack={() => navigation.goBack()} />;
+    }
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
-            {/* Header section (Navbar) */}
             <View style={[styles.header, { backgroundColor: isDark ? theme.surface : theme.primary }]}>
-                <SafeAreaView>
+                <SafeAreaView edges={['left', 'right']}>
                     <View style={styles.navRow}>
                         <View style={styles.navLeft}>
                             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                                 <Ionicons name="arrow-back" size={24} color="white" />
                             </TouchableOpacity>
-                            <View style={{ flexDirection: 'row', gap: 4, marginRight: 8 }}>
-                                {/* <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#22c55e', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'white' }}>
-                                    <ThemedText color="white" weight="bold" style={{ fontSize: 10 }}>Q</ThemedText>
-                                </View>
-                                <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#ef4444', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'white' }}>
-                                    <ThemedText color="white" weight="bold" style={{ fontSize: 10 }}>E</ThemedText>
-                                </View> */}
+                            <View style={{ marginLeft: spacing.xs }}>
+                                <ThemedText weight="bold" color="white" style={{ fontSize: 17 }} numberOfLines={1}>
+                                    {team1Code} vs {team2Code}
+                                </ThemedText>
+                                <ThemedText variant="caption" color="white" style={{ opacity: 0.8 }} numberOfLines={1}>
+                                    {match?.title ? `${match.title}${match.title.endsWith(',') ? '' : ','}` : ''} {match?.venueId?.city || 'Venue'}
+                                </ThemedText>
                             </View>
-                            <ThemedText variant="subtitle" color="white" weight="bold" style={[styles.headerTitle, { flex: 1 }]} numberOfLines={1}>
-                                CSA Provincial One-Day
-                            </ThemedText>
                         </View>
                         <View style={styles.navRight}>
-                            <TouchableOpacity style={styles.headerIcon}>
+                            <TouchableOpacity style={styles.headerIcon} onPress={() => navigation.navigate('MatchLedger', { matchId })}>
                                 <Ionicons name="pin-outline" size={20} color="white" />
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.headerIcon}>
@@ -1090,22 +1312,15 @@ export const MatchDetailScreen: React.FC = () => {
                     tabBarAllowFontScaling: false,
                 }}
             >
-                <Tab.Screen name="Info">
-                    {() => <InfoTab match={match} onTeamPress={handleTeamPress} />}
-                </Tab.Screen>
-                <Tab.Screen name="Live">
-                    {() => <View style={{flex: 1}}>
-                                <ScoreSummaryHeader liveStatus={liveStatus} match={match} />
-                                <LiveTab navigation={navigation} matchId={matchId} liveStatus={liveStatus} ballData={ballData} />
-                            </View>}
-                </Tab.Screen>
-                <Tab.Screen name="Fantasy">
-                    {() => <FantasyTab onViewAll={handleFantasyViewAll} onAnalysis={handleAnalysisPress} />}
-                </Tab.Screen>
-                <Tab.Screen name="Commentary" component={CommentaryTab} />
-                <Tab.Screen name="Scorecard" component={ScorecardTab} />
+                <Tab.Screen name="Info">{() => infoTab}</Tab.Screen>
+                <Tab.Screen name="Live">{() => liveTab}</Tab.Screen>
+                <Tab.Screen name="Fantasy">{() => fantasyTab}</Tab.Screen>
+                <Tab.Screen name="Commentary">{() => commentaryTab}</Tab.Screen>
+                <Tab.Screen name="Scorecard">{() => scorecardTab}</Tab.Screen>
                 <Tab.Screen name="Graphs" component={GraphsTab} />
-                <Tab.Screen name="Points" component={PointsTableTab} options={{ tabBarLabel: 'Points Table' }} />
+                <Tab.Screen name="Points" options={{ tabBarLabel: 'Points Table' }}>
+                    {() => pointsTab}
+                </Tab.Screen>
             </Tab.Navigator>
 
             {/* Main Bottom Sheet Distributor */}
@@ -1121,37 +1336,125 @@ export const MatchDetailScreen: React.FC = () => {
                 <BottomSheetScrollView contentContainerStyle={{ padding: spacing.md }}>
                     {sheetType === 'squad' && (
                         <>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg }}>
-                                <ThemedText variant="subtitle" weight="bold">
-                                    {selectedTeam === 'WP' ? 'Western Province' : 'Lions'} Squad
-                                </ThemedText>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+                                <View>
+                                    <ThemedText variant="subtitle" weight="bold">Team Squads</ThemedText>
+                                    {selectedSquad?.playingXI?.length > 0 && (
+                                        <ThemedText variant="caption" color="primary" weight="bold">PLAYING XI ANNOUNCED</ThemedText>
+                                    )}
+                                </View>
                                 <TouchableOpacity onPress={() => bottomSheetRef.current?.close()}>
                                     <Ionicons name="close" size={24} color={theme.text} />
                                 </TouchableOpacity>
                             </View>
 
-                            {Object.entries(groupedSquad).map(([role, players]) => (
-                                players.length > 0 && (
-                                    <View key={role} style={{ marginBottom: spacing.lg }}>
-                                        <View style={{ borderBottomWidth: 1, borderBottomColor: theme.border, paddingBottom: 4, marginBottom: spacing.sm }}>
-                                            <ThemedText color="primary" weight="bold" variant="small">{role.toUpperCase()}</ThemedText>
+                            {/* Team Switcher Tabs */}
+                            <View style={{ flexDirection: 'row', backgroundColor: isDark ? theme.background : theme.borderLight, borderRadius: 10, padding: 4, marginBottom: spacing.lg }}>
+                                <TouchableOpacity
+                                    onPress={() => setSelectedTeamIndex(0)}
+                                    style={{
+                                        flex: 1,
+                                        paddingVertical: 8,
+                                        alignItems: 'center',
+                                        borderRadius: 8,
+                                        backgroundColor: selectedTeamIndex === 0 ? (isDark ? theme.surface : '#fff') : 'transparent',
+                                        ... (selectedTeamIndex === 0 ? elevation.sm : {})
+                                    }}
+                                >
+                                    <ThemedText weight="bold" color={selectedTeamIndex === 0 ? 'primary' : 'textSecondary'}>{team1Code}</ThemedText>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={() => setSelectedTeamIndex(1)}
+                                    style={{
+                                        flex: 1,
+                                        paddingVertical: 8,
+                                        alignItems: 'center',
+                                        borderRadius: 8,
+                                        backgroundColor: selectedTeamIndex === 1 ? (isDark ? theme.surface : '#fff') : 'transparent',
+                                        ... (selectedTeamIndex === 1 ? elevation.sm : {})
+                                    }}
+                                >
+                                    <ThemedText weight="bold" color={selectedTeamIndex === 1 ? 'primary' : 'textSecondary'}>{team2Code}</ThemedText>
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Section Renderer */}
+                            {(() => {
+                                const hasPxi = selectedSquad?.playingXI?.length > 0;
+                                const hasBench = selectedSquad?.bench?.length > 0;
+
+                                if (!hasPxi && !hasBench) {
+                                    return (
+                                        <View style={{ padding: spacing.xl, alignItems: 'center' }}>
+                                            <Ionicons name="shirt-outline" size={48} color={theme.textSecondary} />
+                                            <ThemedText color="textSecondary" style={{ marginTop: spacing.md, textAlign: 'center' }}>
+                                                No players found in squad
+                                            </ThemedText>
                                         </View>
-                                        <View style={styles.squadGrid}>
-                                            {players.map((player, index) => (
-                                                <View key={index} style={styles.squadItem}>
-                                                    <View style={[styles.playerAvatarPlaceholder, { backgroundColor: theme.primary + '20' }]}>
-                                                        <Ionicons name="person" size={20} color={theme.primary} />
+                                    );
+                                }
+
+                                const renderGroups = (groups: any, sectionTitle: string) => (
+                                    <View style={{ marginBottom: spacing.xl }}>
+                                        <View style={{
+                                            backgroundColor: theme.primary + '15',
+                                            paddingHorizontal: spacing.md,
+                                            paddingVertical: 6,
+                                            borderRadius: 4,
+                                            marginBottom: spacing.md
+                                        }}>
+                                            <ThemedText color="primary" weight="bold" variant="small">{sectionTitle}</ThemedText>
+                                        </View>
+                                        {Object.entries(groups).map(([role, players]) => (
+                                            (players as any[]).length > 0 && (
+                                                <View key={role} style={{ marginBottom: spacing.md }}>
+                                                    <View style={{ borderBottomWidth: 1, borderBottomColor: theme.border + '50', paddingBottom: 4, marginBottom: spacing.sm }}>
+                                                        <ThemedText color="textSecondary" weight="medium" style={{ fontSize: 10 }}>{role.toUpperCase()}</ThemedText>
                                                     </View>
-                                                    <View style={{ flex: 1 }}>
-                                                        <ThemedText weight="bold" variant="small" numberOfLines={1}>{player.name}</ThemedText>
-                                                        <ThemedText variant="caption" color="textSecondary">{player.role}</ThemedText>
+                                                    <View style={styles.squadGrid}>
+                                                        {(players as any[]).map((player, index) => {
+                                                            const isCaptain = selectedSquad?.captainId?._id?.toString() === player._id?.toString();
+                                                            const isVC = selectedSquad?.viceCaptainId?._id?.toString() === player._id?.toString();
+                                                            const isWK = selectedSquad?.wicketKeeperId?._id?.toString() === player._id?.toString();
+                                                            return (
+                                                                <View key={player._id || index} style={styles.squadItem}>
+                                                                    <View style={[styles.playerAvatarPlaceholder, { backgroundColor: theme.primary + '20' }]}>
+                                                                        {player.image
+                                                                            ? <Image source={{ uri: player.image }} style={{ width: 40, height: 40, borderRadius: 20 }} />
+                                                                            : <Ionicons name="person" size={20} color={theme.primary} />}
+                                                                    </View>
+                                                                    <View style={{ flex: 1 }}>
+                                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                                                            <ThemedText weight="bold" variant="small" numberOfLines={1} style={{ flex: 1 }}>{player.name}</ThemedText>
+                                                                            {isCaptain && <View style={[styles.badge, { backgroundColor: theme.primary + '25' }]}><ThemedText variant="caption" weight="bold" color="primary">C</ThemedText></View>}
+                                                                            {isVC && <View style={[styles.badge, { backgroundColor: theme.textSecondary + '25' }]}><ThemedText variant="caption" weight="bold" color="textSecondary">VC</ThemedText></View>}
+                                                                            {isWK && <View style={[styles.badge, { backgroundColor: '#f59e0b25' }]}><ThemedText variant="caption" weight="bold" style={{ color: '#f59e0b' }}>WK</ThemedText></View>}
+                                                                        </View>
+                                                                        <ThemedText variant="caption" color="textSecondary">{player.role}</ThemedText>
+                                                                    </View>
+                                                                </View>
+                                                            );
+                                                        })}
                                                     </View>
                                                 </View>
-                                            ))}
-                                        </View>
+                                            )
+                                        ))}
                                     </View>
-                                )
-                            ))}
+                                );
+
+                                return (
+                                    <>
+                                        {hasPxi ? (
+                                            <>
+                                                {renderGroups(squadGroups.playingXI, "PLAYING XI")}
+                                                {hasBench && renderGroups(squadGroups.bench, "ON BENCH")}
+                                            </>
+                                        ) : (
+                                            renderGroups(squadGroups.bench, "SQUAD")
+                                        )}
+                                    </>
+                                );
+                            })()}
                         </>
                     )}
 
@@ -1665,6 +1968,13 @@ const styles = StyleSheet.create({
         borderRadius: 4,
         minWidth: 35,
         alignItems: 'center',
+    },
+    badge: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     squadGrid: {
         flexDirection: 'row',

@@ -41,7 +41,7 @@ export type RootStackParamList = {
   AllNews: undefined;
   NewsDetail: { newsId: string };
   SeriesDetail: { seriesId: string };
-  MatchDetails: { matchId: string };
+  MatchDetails: { matchId: string; team1Name?: string; team2Name?: string };
   PlayerProfile: { playerId: string };
   VenueDetail: { venueId: string };
   AllVenues: undefined;
