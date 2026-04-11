@@ -14,8 +14,8 @@ export const MatchService = {
       if (filters.page) params.append('page', filters.page.toString());
       if (filters.limit) params.append('limit', filters.limit.toString());
 
-      const response = await axiosInstance.get(`/matches?${params.toString()}`);
-      // main-app response: { statusCode, status, data: { result: [...], total, totalPages } }
+      const response = await axiosInstance.get(`/app/matches?${params.toString()}`);
+      // app matches response: { statusCode, status, data: { result: [...] } }
       return response.data?.data?.result ?? response.data?.data ?? response.data;
     } catch (error) {
       console.error('Error fetching matches:', error);
@@ -25,7 +25,7 @@ export const MatchService = {
 
   getMatchDetails: async (matchId: string) => {
     try {
-      const response = await axiosInstance.get(`/matches/${matchId}`);
+      const response = await axiosInstance.get(`/app/matches/${matchId}`);
       return response.data?.data?.result ?? response.data?.result ?? response.data;
     } catch (error) {
       console.error(`Error fetching match details for ${matchId}:`, error);

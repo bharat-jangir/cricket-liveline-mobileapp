@@ -207,9 +207,9 @@ export const HomeScreen: React.FC = () => {
   );
 
   const renderLiveMatch = ({ item }: { item: any }) => {
-    // Determine team names safely (could be populated object or just string id)
-    const team1Name = item.teamAId?.shortName || item.teamAId?.name || item.teamA?.shortName || item.teamA?.name || 'Team 1';
-    const team2Name = item.teamBId?.shortName || item.teamBId?.name || item.teamB?.shortName || item.teamB?.name || 'Team 2';
+    // Determine team names safely (AppMatchesService now outputs flattened team1 and team2 structures)
+    const team1Name = item.team1?.name || item.team1?.code || item.teamAId?.shortName || 'Team 1';
+    const team2Name = item.team2?.name || item.team2?.code || item.teamBId?.shortName || 'Team 2';
     
     return (
       <TouchableOpacity
@@ -229,10 +229,10 @@ export const HomeScreen: React.FC = () => {
           <View style={styles.matchInfo}>
             {/* Show Toss or Series temporarily if live score is not built in the list API */}
             <ThemedText style={[styles.teamScore, { color: theme.text }]} numberOfLines={1}>
-              {item.title || item.seriesId?.name || item.series?.name || 'Match'}
+              {item.series || item.title || 'Match'}
             </ThemedText>
             <ThemedText style={[{ fontSize: 10, color: theme.textSecondary }]} numberOfLines={1}>
-              {typeof item.toss === 'string' ? item.toss : (item.toss?.tossText || item.matchState || 'Toss not updated')}
+              {item.result || item.status || 'Match Scheduled'}
             </ThemedText>
           </View>
         </Card>

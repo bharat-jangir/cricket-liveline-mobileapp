@@ -47,12 +47,15 @@ const MatchList = ({ route }: any) => {
   }, [activeTab]);
 
   const renderMatch = ({ item }: any) => {
-    const team1Name = item.teamAId?.shortName || item.teamAId?.name || item.team1Code || 'T1';
-    const team2Name = item.teamBId?.shortName || item.teamBId?.name || item.team2Code || 'T2';
-    const score1 = item.liveStatus?.score || item.team1Score;
-    const overs1 = item.liveStatus?.overs || item.team1Overs;
-    const score2 = item.liveStatus?.team2Score || item.team2Score; // Backend might need adjustment for team2 score in liveStatus
-    const overs2 = item.liveStatus?.team2Overs || item.team2Overs;
+    const team1Name = item.team1?.code || item.teamAId?.shortName || (typeof item.team1 === 'string' ? item.team1 : 'T1');
+    const team2Name = item.team2?.code || item.teamBId?.shortName || (typeof item.team2 === 'string' ? item.team2 : 'T2');
+    const team1FullName = item.team1?.name || item.teamAId?.name || (typeof item.team1 === 'string' ? item.team1 : 'Team 1');
+    const team2FullName = item.team2?.name || item.teamBId?.name || (typeof item.team2 === 'string' ? item.team2 : 'Team 2');
+    
+    const score1 = item.team1?.score || item.liveStatus?.score || item.team1Score;
+    const overs1 = item.team1?.overs || item.liveStatus?.overs || item.team1Overs;
+    const score2 = item.team2?.score || item.liveStatus?.team2Score || item.team2Score;
+    const overs2 = item.team2?.overs || item.liveStatus?.team2Overs || item.team2Overs;
 
     return (
       <TouchableOpacity
@@ -78,7 +81,7 @@ const MatchList = ({ route }: any) => {
           <View style={styles.teamRow}>
             <View style={styles.teamInfo}>
               <ThemedText variant="subtitle" weight="bold">{team1Name}</ThemedText>
-              <ThemedText variant="caption" color="textSecondary">{item.teamAId?.name || item.team1}</ThemedText>
+              <ThemedText variant="caption" color="textSecondary">{team1FullName}</ThemedText>
             </View>
             <View style={styles.scoreRow}>
               {score1 && (
@@ -105,7 +108,7 @@ const MatchList = ({ route }: any) => {
           <View style={styles.teamRow}>
             <View style={styles.teamInfo}>
               <ThemedText variant="subtitle" weight="bold">{team2Name}</ThemedText>
-              <ThemedText variant="caption" color="textSecondary">{item.teamBId?.name || item.team2}</ThemedText>
+              <ThemedText variant="caption" color="textSecondary">{team2FullName}</ThemedText>
             </View>
             {score2 && (
               <View style={styles.scoreInfo}>

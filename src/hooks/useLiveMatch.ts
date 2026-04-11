@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 
-// Use same IP as API_URL but on port 5003 (Socket Service)
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.51:5000/api';
-const SOCKET_URL = API_URL.replace(':5000/api', ':5003').replace(':5000', ':5003');
+// Use same IP as API_URL but on port 5002 (Socket Service)
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://6d5c-43-249-53-242.ngrok-free.app/api';
+const SOCKET_URL = API_URL.replace(':5000/api', ':5002').replace(':5000', ':5002');
 
 export function useLiveMatch(matchId: string) {
   const socketRef = useRef<Socket | null>(null);
-  
+
   // Expose the last received payloads so components can just react to state changes
   const [matchStatus, setMatchStatus] = useState<any>(null);
   const [ballData, setBallData] = useState<any>(null);
@@ -18,7 +18,7 @@ export function useLiveMatch(matchId: string) {
     if (!matchId) return;
 
     console.log(`[Socket] Connecting to /live namespace for match ${matchId}`);
-    
+
     socketRef.current = io(`${SOCKET_URL}/live`, {
       transports: ['websocket', 'polling'], // fallback
     });
