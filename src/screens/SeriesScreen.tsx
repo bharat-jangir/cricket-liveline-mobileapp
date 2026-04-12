@@ -73,7 +73,7 @@ const SeriesList = () => {
         return fetchedSeries.reduce((acc: any, series: any) => {
             const date = series.startDate ? new Date(series.startDate) : new Date();
             const month = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-            
+
             const existing = acc.find((g: any) => g.title === month);
             if (existing) {
                 existing.data.push(series);
@@ -117,7 +117,7 @@ const SeriesList = () => {
                         <View style={styles.cardContent}>
                             <ThemedText variant="subtitle" weight="bold">{item.name}</ThemedText>
                             <ThemedText variant="caption" color="textSecondary">
-                                {item.startDate ? new Date(item.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''} - 
+                                {item.startDate ? new Date(item.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''} -
                                 {item.endDate ? new Date(item.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
                             </ThemedText>
                             <ThemedText variant="caption" color="primary" weight="semibold">Tournament: {item.tournamentId?.name || 'Generic'}</ThemedText>
@@ -151,9 +151,9 @@ export const SeriesScreen: React.FC = () => {
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
-            <LinearGradient colors={isDark ? [theme.surface, theme.background] : [theme.primary, theme.primaryDark]} style={styles.header}>
+            {/* <LinearGradient colors={isDark ? [theme.surface, theme.background] : [theme.primary, theme.primaryDark]} style={styles.header}>
                 <ThemedText variant="title" color="white" weight="bold">Series</ThemedText>
-            </LinearGradient>
+            </LinearGradient> */}
 
             <TopTab.Navigator
                 initialRouteName="Active"

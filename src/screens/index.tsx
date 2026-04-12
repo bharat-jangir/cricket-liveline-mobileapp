@@ -14,6 +14,8 @@ import { Card } from '@/components/ui/Card';
 import { spacing } from '@/theme';
 
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { MatchCard } from '@/components/MatchCard';
+import { MatchCardSkeleton } from '@/components/MatchCardSkeleton';
 
 const Tab = createMaterialTopTabNavigator();
 
@@ -42,110 +44,57 @@ const MatchList = ({ route }: any) => {
     setRefreshing(false);
   }, [fetchMatches]);
 
-  const renderMatch = ({ item }: any) => {
+  const mapApiToMatch = (item: any) => {
     const team1Name = item.team1?.name || item.team1?.code || item.teamAId?.shortName || (typeof item.team1 === 'string' ? item.team1 : 'T1');
     const team2Name = item.team2?.name || item.team2?.code || item.teamBId?.shortName || (typeof item.team2 === 'string' ? item.team2 : 'T2');
 
-    const score1 = item.team1?.score || item.liveStatus?.score || item.team1Score;
-    const overs1 = item.team1?.overs || item.liveStatus?.overs || item.team1Overs;
-    const score2 = item.team2?.score || item.liveStatus?.team2Score || item.team2Score;
-    const overs2 = item.team2?.overs || item.liveStatus?.team2Overs || item.team2Overs;
+    return {
+      id: item._id || item.id,
+      series: item.seriesId?.name || item.series?.name || item.series || 'Series',
+      format: item.matchFormat || item.format || 'T20',
+      team1: {
+        name: team1Name,
+        code: item.team1?.code || item.teamAId?.shortName || 'T1',
+        score: item.team1?.score || item.liveStatus?.score || item.team1Score,
+        overs: item.team1?.overs || item.liveStatus?.overs || item.team1Overs,
+      },
+      team2: {
+        name: team2Name,
+        code: item.team2?.code || item.teamBId?.shortName || 'T2',
+        score: item.team2?.score || item.liveStatus?.team2Score || item.team2Score,
+        overs: item.team2?.overs || item.liveStatus?.team2Overs || item.team2Overs,
+      },
+      status: item.status === 'live' ? 'Live' : (item.status === 'scheduled' ? 'Scheduled' : 'Completed'),
+      venue: item.venueId?.name || item.venue?.name || item.venue || 'Venue',
+      time: item.startTime ? new Date(item.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined,
+      runRate: item.liveStatus?.runRate,
+      result: typeof item.result === 'string' ? item.result : (item.result?.resultText || item.toss?.tossText)
+    };
+  };
 
-    const currentBattingTeamId = item.liveStatus?.battingTeam || item.battingTeam;
-    const currentBattingTeamStr = currentBattingTeamId ? String(currentBattingTeamId).toLowerCase() : '';
-    const isTeam1Batting = currentBattingTeamId && (
-      currentBattingTeamStr === String(item.team1?.code).toLowerCase() ||
-      currentBattingTeamStr === String(item.team1?._id).toLowerCase() ||
-      currentBattingTeamStr === String(item.teamAId?._id).toLowerCase()
-    );
-    const isTeam2Batting = currentBattingTeamId && (
-      currentBattingTeamStr === String(item.team2?.code).toLowerCase() ||
-      currentBattingTeamStr === String(item.team2?._id).toLowerCase() ||
-      currentBattingTeamStr === String(item.teamBId?._id).toLowerCase()
-    );
-
-    const isLive = item.status && String(item.status).toLowerCase() === 'live';
-    const displayStatus = item.status || 'Match';
-    const resultText = typeof item.result === 'string' ? item.result : (item.result?.resultText || item.toss?.tossText || item.info);
-
+  const renderMatch = ({ item }: any) => {
+    const mappedMatch = mapApiToMatch(item);
     return (
-      <TouchableOpacity
-        style={[styles.matchCard, { backgroundColor: theme.surface }]}
-        activeOpacity={0.7}
-        onPress={() => navigation.navigate('MatchDetails', { 
-          matchId: item._id || item.id, 
-          team1Name: team1Name, 
-          team2Name: team2Name 
-        })}
-      >
-        <View style={[styles.matchHeader, { borderBottomWidth: 1, borderBottomColor: theme.border, paddingBottom: spacing.sm, marginBottom: spacing.sm }]}>
-          <ThemedText variant="caption" color="textSecondary" weight="semibold">
-            {item.seriesId?.name || item.series?.name || item.series || 'Series'} • {item.matchFormat || item.format}
-          </ThemedText>
-          <ThemedText variant="caption" color="textSecondary">{item.venueId?.name || item.venue?.name || item.venue}</ThemedText>
-        </View>
-
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          {/* Left Section: Teams & Scores */}
-          <View style={{ flex: 3, paddingRight: spacing.sm, justifyContent: 'center' }}>
-            <View style={{ marginBottom: spacing.md }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                {isTeam1Batting && <View style={[styles.battingIndicator, { backgroundColor: theme.primary }]} />}
-                <ThemedText variant="subtitle" weight="bold">{team1Name}</ThemedText>
-              </View>
-              {score1 ? (
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', marginTop: 2 }}>
-                  <ThemedText variant="body" weight="bold" color="text">{score1}</ThemedText>
-                  {overs1 ? <ThemedText variant="caption" color="textSecondary" style={{ marginLeft: 4 }}>({overs1})</ThemedText> : null}
-                </View>
-              ) : (
-                <ThemedText variant="caption" color="textSecondary" style={{ marginTop: 2 }}>Yet to bat</ThemedText>
-              )}
-            </View>
-
-            <View>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                {isTeam2Batting && <View style={[styles.battingIndicator, { backgroundColor: theme.primary }]} />}
-                <ThemedText variant="subtitle" weight="bold">{team2Name}</ThemedText>
-              </View>
-              {score2 ? (
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', marginTop: 2 }}>
-                  <ThemedText variant="body" weight="bold" color="text">{score2}</ThemedText>
-                  {overs2 ? <ThemedText variant="caption" color="textSecondary" style={{ marginLeft: 4 }}>({overs2})</ThemedText> : null}
-                </View>
-              ) : (
-                <ThemedText variant="caption" color="textSecondary" style={{ marginTop: 2 }}>Yet to bat</ThemedText>
-              )}
-            </View>
-          </View>
-
-          {/* Right Section: Status & Result */}
-          <View style={{ flex: 2, alignItems: 'flex-end', justifyContent: 'center', borderLeftWidth: 1, borderLeftColor: theme.border, paddingLeft: spacing.sm }}>
-            {isLive ? (
-              <View style={[styles.liveBadgeInline, { backgroundColor: isDark ? theme.surface : '#FF3B3015' }]}>
-                <View style={[styles.liveDot, { backgroundColor: '#FF3B30' }]} />
-                <ThemedText variant="caption" style={{ color: '#FF3B30' }} weight="bold">LIVE</ThemedText>
-              </View>
-            ) : (
-              <View style={[styles.statusBadge, { backgroundColor: theme.border }]}>
-                <ThemedText variant="caption" color="text" weight="bold" style={{ textTransform: 'uppercase' }}>{displayStatus}</ThemedText>
-              </View>
-            )}
-
-            <ThemedText
-              variant="caption"
-              color={isLive ? 'primary' : 'textSecondary'}
-              weight={isLive ? 'bold' : 'normal'}
-              style={{ textAlign: 'right', marginTop: spacing.md }}
-              numberOfLines={4}
-            >
-              {resultText || (isLive ? 'Match in progress' : 'Match ended')}
-            </ThemedText>
-          </View>
-        </View>
-      </TouchableOpacity>
+      <View style={{ marginBottom: spacing.md }}>
+        <MatchCard
+          match={mappedMatch}
+          onPress={() => navigation.navigate('MatchDetails', {
+            matchId: mappedMatch.id,
+            team1Name: mappedMatch.team1.name,
+            team2Name: mappedMatch.team2.name
+          })}
+        />
+      </View>
     );
   };
+
+  if (loading && !refreshing) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.background, padding: spacing.md }]}>
+        {[1, 2, 3, 4].map(i => <MatchCardSkeleton key={i} />)}
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -164,11 +113,9 @@ const MatchList = ({ route }: any) => {
           />
         }
         ListEmptyComponent={
-          !loading ? (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 50 }}>
-              <ThemedText color="textSecondary">No {activeTab} matches found</ThemedText>
-            </View>
-          ) : null
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 50 }}>
+            <ThemedText color="textSecondary">No {activeTab} matches found</ThemedText>
+          </View>
         }
       />
     </View>
@@ -180,9 +127,9 @@ export const MatchesScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={isDark ? [theme.surface, theme.background] : [theme.primary, theme.primaryDark]} style={styles.header}>
+      {/* <LinearGradient colors={isDark ? [theme.surface, theme.background] : [theme.primary, theme.primaryDark]} style={styles.header}>
         <ThemedText variant="title" color="white" weight="bold">Matches</ThemedText>
-      </LinearGradient>
+      </LinearGradient> */}
       <Tab.Navigator
         screenOptions={{
           tabBarStyle: { backgroundColor: theme.surface },

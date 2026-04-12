@@ -5,6 +5,9 @@ import { NavigationContainer } from "@react-navigation/native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ThemeProvider } from "./src/theme/ThemeContext";
+import { Provider } from 'react-redux';
+import { PersistGate } from 'redux-persist/integration/react';
+import { store, persistor } from './src/store';
 import { AppNavigator } from "./src/navigation/AppNavigator";
 
 // Globally disable OS-level font scaling for accessibility settings
@@ -20,15 +23,19 @@ interface TextWithDefaultProps extends React.FC<any> {
 
 export default function App() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <StatusBar style="light" translucent={true} backgroundColor="#1877f2" />
+    <Provider store={store}>
+      <PersistGate loading={null} persistor={persistor}>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <StatusBar style="light" translucent={true} backgroundColor="#1877f2" />
 
-      <ThemeProvider>
-        <SafeAreaProvider>
-          <AppContent />
-        </SafeAreaProvider>
-      </ThemeProvider>
-    </GestureHandlerRootView>
+          <ThemeProvider>
+            <SafeAreaProvider>
+              <AppContent />
+            </SafeAreaProvider>
+          </ThemeProvider>
+        </GestureHandlerRootView>
+      </PersistGate>
+    </Provider>
   );
 }
 

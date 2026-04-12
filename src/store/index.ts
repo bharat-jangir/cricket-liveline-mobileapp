@@ -2,17 +2,19 @@ import { configureStore } from '@reduxjs/toolkit';
 import { persistStore, persistReducer } from 'redux-persist';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import appReducer from './appSlice';
+import matchReducer from './matchSlice';
 
 const persistConfig = {
   key: 'root',
   storage: AsyncStorage,
 };
 
-const persistedReducer = persistReducer(persistConfig, appReducer);
+const persistedAppReducer = persistReducer(persistConfig, appReducer);
 
 export const store = configureStore({
   reducer: {
-    app: persistedReducer,
+    app: persistedAppReducer,
+    match: matchReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

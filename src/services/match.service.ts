@@ -38,7 +38,7 @@ export const MatchService = {
 
   getLiveStatus: async (matchId: string) => {
     try {
-      const response = await axiosInstance.get(`/matches/${matchId}/live-status`);
+      const response = await axiosInstance.get(`/app/matches/${matchId}/live-status`);
       console.log('[MatchService.getLiveStatus] Raw response.data:', JSON.stringify(response.data).substring(0, 800));
       const result = response.data?.data?.result ?? response.data?.result ?? response.data?.data ?? response.data;
       console.log('[MatchService.getLiveStatus] Extracted result keys:', result ? Object.keys(result) : 'null');
@@ -51,8 +51,18 @@ export const MatchService = {
   
   getScorecard: async (matchId: string, inningNumber: number = 1) => {
     try {
-      const response = await axiosInstance.get(`/matches/${matchId}/scorecard/${inningNumber}`);
-      return response.data?.data?.result ?? response.data?.result ?? response.data;
+      const response = await axiosInstance.get(`/app/matches/${matchId}/scorecard/${inningNumber}`);
+      const result = response.data?.data?.result ?? response.data?.result ?? response.data;
+      
+      console.log(`[MatchService.getScorecard] Inning ${inningNumber} response:`);
+      if (result && result.batting) {
+        console.log(`  Batting: ${result.batting.map((p: any) => `${p.playerName || p.playerId?.name} (v:${p.isVisible})`).join(', ')}`);
+      }
+      if (result && result.bowling) {
+        console.log(`  Bowling: ${result.bowling.map((p: any) => `${p.playerName || p.playerId?.name} (v:${p.isVisible})`).join(', ')}`);
+      }
+      
+      return result;
     } catch (error) {
       console.error(`Error fetching scorecard for match ${matchId}, inning ${inningNumber}:`, error);
       throw error;
@@ -62,7 +72,7 @@ export const MatchService = {
   getRecentOvers: async (matchId: string, inningNumber?: number) => {
     try {
       const params = inningNumber ? `?inningNumber=${inningNumber}` : '';
-      const response = await axiosInstance.get(`/matches/${matchId}/recent-overs${params}`);
+      const response = await axiosInstance.get(`/app/matches/${matchId}/recent-overs${params}`);
       return response.data?.data?.result ?? response.data?.result ?? response.data;
     } catch (error) {
       console.error(`Error fetching recent overs for match ${matchId}:`, error);
@@ -70,9 +80,20 @@ export const MatchService = {
     }
   },
 
+  getPartnerships: async (matchId: string, inningNumber?: number) => {
+    try {
+      const params = inningNumber ? `?inningNumber=${inningNumber}` : '';
+      const response = await axiosInstance.get(`/app/matches/${matchId}/partnerships${params}`);
+      return response.data?.data?.result ?? response.data?.result ?? response.data;
+    } catch (error) {
+      console.error(`Error fetching partnerships for match ${matchId}:`, error);
+      return [];
+    }
+  },
+
   getSquads: async (matchId: string) => {
     try {
-      const response = await axiosInstance.get(`/matches/${matchId}/squads`);
+      const response = await axiosInstance.get(`/app/matches/${matchId}/squads`);
       const raw = response.data;
       console.log('[MatchService.getSquads] status:', raw?.statusCode, 'keys:', raw ? Object.keys(raw) : 'null');
       // successWithSingle wraps in { statusCode, data: { result: [...] } }
@@ -94,6 +115,27 @@ export const MatchService = {
       return Array.isArray(result) ? result : [];
     } catch (error) {
       console.error(`Error fetching points table for series ${seriesId}:`, error);
+      return [];
+    }
+  },
+
+  getSessions: async (matchId: string) => {
+    try {
+      const response = await axiosInstance.get(`/app/matches/${matchId}/sessions`);
+      return response.data?.data?.result ?? response.data?.result ?? response.data;
+    } catch (error) {
+      console.error(`Error fetching sessions for match ${matchId}:`, error);
+      return [];
+    }
+  },
+
+  getCommentary: async (matchId: string) => {
+    try {
+      const response = await axiosInstance.get(`/app/matches/${matchId}/commentary`);
+      const data = response.data?.data?.result ?? response.data?.result ?? response.data?.data ?? response.data;
+      return Array.isArray(data) ? data : [];
+    } catch (error) {
+      console.error(`Error fetching commentary for match ${matchId}:`, error);
       return [];
     }
   },

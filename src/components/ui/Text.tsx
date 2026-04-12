@@ -1,15 +1,14 @@
 import React from 'react';
-import { Text as RNText, TextStyle } from 'react-native';
+import { Text as RNText, TextStyle, TextProps as RNTextProps } from 'react-native';
 import { useTheme } from '@/theme/ThemeContext';
 import { fontSize } from '@/theme';
 
-interface TextProps {
+interface TextProps extends RNTextProps {
   children: React.ReactNode;
   variant?: 'heading' | 'title' | 'subtitle' | 'body' | 'caption' | 'small';
-  color?: 'primary' | 'secondary' | 'text' | 'textSecondary' | 'textLight' | 'white' | 'error' | 'success';
+  color?: 'primary' | 'primaryDark' | 'primaryLight' | 'secondary' | 'text' | 'textSecondary' | 'textLight' | 'white' | 'error' | 'success';
   weight?: 'normal' | 'medium' | 'semibold' | 'bold';
   align?: 'left' | 'center' | 'right';
-  numberOfLines?: number;
   style?: TextStyle | TextStyle[] | any;
 }
 
@@ -19,8 +18,8 @@ export const Text: React.FC<TextProps> = ({
   color = 'text',
   weight = 'normal',
   align = 'left',
-  numberOfLines,
   style,
+  ...rest
 }) => {
   const { theme } = useTheme();
 
@@ -70,6 +69,12 @@ export const Text: React.FC<TextProps> = ({
       case 'primary':
         baseStyle.color = theme.primary;
         break;
+      case 'primaryDark':
+        baseStyle.color = (theme as any).primaryDark || theme.primary;
+        break;
+      case 'primaryLight':
+        baseStyle.color = (theme as any).primaryLight || theme.primary;
+        break;
       case 'secondary':
         baseStyle.color = theme.secondary;
         break;
@@ -95,5 +100,14 @@ export const Text: React.FC<TextProps> = ({
     return baseStyle;
   };
 
-  return <RNText style={[getTextStyle(), style]} numberOfLines={numberOfLines} allowFontScaling={false} maxFontSizeMultiplier={1}>{children}</RNText>;
+  return (
+    <RNText 
+      style={[getTextStyle(), style]} 
+      allowFontScaling={false} 
+      maxFontSizeMultiplier={1}
+      {...rest}
+    >
+      {children}
+    </RNText>
+  );
 };
