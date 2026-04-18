@@ -952,11 +952,32 @@ const ScoreSummaryHeader = ({ liveStatus, match }: { liveStatus: any, match: any
 
     if (!liveStatus && !match) return <View style={[styles.liveScoreSection, { backgroundColor: headerBg }]} />
 
+    const status = match?.status || 'scheduled';
+    const isScheduled = status === 'scheduled';
+    const isCompleted = status === 'completed';
+
     const teamCode = liveStatus?.battingTeamId?.shortName || liveStatus?.battingTeamId?.name || match?.teamAId?.shortName || 'T1';
     const score = liveStatus?.score || '0-0';
     const overs = liveStatus?.overs || '0.0';
     const crr = liveStatus?.runRate || '0.00';
-    const toss = liveStatus?.toss?.tossText || liveStatus?.toss || match?.toss?.tossText || 'Toss Pending';
+    const toss = liveStatus?.toss?.tossText || liveStatus?.toss || match?.toss?.tossText || (isScheduled ? 'Toss Pending' : '');
+
+    // Format Date/Time for scheduled matches
+    const formatMatchTime = (dateStr: any) => {
+        if (!dateStr) return 'Time Pending';
+        try {
+            const date = new Date(dateStr);
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+        } catch { return 'Time Pending'; }
+    };
+
+    const formatMatchDate = (dateStr: any) => {
+        if (!dateStr) return '';
+        try {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString([], { day: 'numeric', month: 'short' });
+        } catch { return ''; }
+    };
 
     return (
         <View style={[styles.liveScoreSection, { backgroundColor: headerBg }]}>
@@ -964,22 +985,35 @@ const ScoreSummaryHeader = ({ liveStatus, match }: { liveStatus: any, match: any
                 {/* LEFT: Logo + Team/Score */}
                 <View style={styles.leftInfoBlock}>
                     <View style={[styles.teamLogoBadge, { backgroundColor: isDark ? theme.background : 'rgba(255,255,255,0.2)', borderColor: 'rgba(255,255,255,0.1)' }]}>
-                        {match?.teamAId?.logo ? <Image source={{ uri: match.teamAId.logo }} style={styles.scoreTeamLogo} /> : <Ionicons name="shirt-outline" size={24} color="white" />}
+                        {match?.teamAId?.logo || match?.teamA?.logo ? <Image source={{ uri: match?.teamAId?.logo || match?.teamA?.logo }} style={styles.scoreTeamLogo} /> : <Ionicons name="shirt-outline" size={24} color="white" />}
                     </View>
 
                     <View style={styles.scoreTextsBlock}>
                         <View style={styles.teamCodeRow}>
                             <ThemedText weight="bold" color="white" style={styles.teamCodeText}>{teamCode}</ThemedText>
-                            {/* Assuming P1 is active if it's a live match with powerplay active */}
-                            {liveStatus?.isPowerplay && (
+                            {isScheduled && (
+                                <View style={[styles.p1Badge, { backgroundColor: '#f59e0b' }]}>
+                                    <ThemedText color="white" weight="bold" style={styles.p1BadgeText}>UPCOMING</ThemedText>
+                                </View>
+                            )}
+                            {liveStatus?.isPowerplay && !isScheduled && (
                                 <View style={styles.p1Badge}>
                                     <ThemedText color="white" weight="bold" style={styles.p1BadgeText}>P1</ThemedText>
                                 </View>
                             )}
                         </View>
                         <View style={styles.scoreRow}>
-                            <ThemedText variant="title" weight="bold" color="white" style={styles.liveScoreText}>{score}</ThemedText>
-                            <ThemedText color="white" style={[styles.oversText, { opacity: 0.8 }]}>{overs}</ThemedText>
+                            {isScheduled ? (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <ThemedText variant="subtitle" weight="bold" color="white">{formatMatchTime(match?.matchDate)}</ThemedText>
+                                    <ThemedText color="white" style={{ opacity: 0.8, fontSize: 12 }}>{formatMatchDate(match?.matchDate)}</ThemedText>
+                                </View>
+                            ) : (
+                                <>
+                                    <ThemedText variant="title" weight="bold" color="white" style={styles.liveScoreText}>{score}</ThemedText>
+                                    <ThemedText color="white" style={[styles.oversText, { opacity: 0.8 }]}>{overs}</ThemedText>
+                                </>
+                            )}
                         </View>
                     </View>
                 </View>
@@ -989,9 +1023,23 @@ const ScoreSummaryHeader = ({ liveStatus, match }: { liveStatus: any, match: any
                     <View style={[styles.scoreDivider, { backgroundColor: 'rgba(255,255,255,0.3)' }]} />
                 </View>
 
-                {/* RIGHT: Large Ball Run */}
+                {/* RIGHT: Status / Result */}
                 <View style={styles.secondaryScore}>
                     {(() => {
+                        if (isCompleted) {
+                            return (
+                                <ThemedText style={[styles.normalStatusText, { color: '#fde047', fontSize: 14 }]} numberOfLines={2}>
+                                    {match?.result?.resultText || 'Match Finished'}
+                                </ThemedText>
+                            );
+                        }
+
+                        if (isScheduled) {
+                            return (
+                                <Ionicons name="time-outline" size={32} color="#fde047" />
+                            );
+                        }
+
                         const val = (liveStatus?.currentBall || '0').toString().trim();
                         const isBig = ['0', '1', '2', '3', '4', '5', '6', 'w', 'wkt', 'wicket', 'wd', 'wide', 'nb', 'no ball', 'lb', 'b'].includes(val.toLowerCase());
 
@@ -1009,7 +1057,13 @@ const ScoreSummaryHeader = ({ liveStatus, match }: { liveStatus: any, match: any
             </View>
 
             <View style={[styles.crrTossRow, { borderTopColor: 'rgba(255,255,255,0.1)' }]}>
-                <ThemedText color="white" variant="small" style={{ opacity: 0.8 }}>CRR: {crr}</ThemedText>
+                {isScheduled ? (
+                    <ThemedText color="white" variant="small" style={{ opacity: 0.8 }}>Countdown to Toss</ThemedText>
+                ) : !isCompleted ? (
+                    <ThemedText color="white" variant="small" style={{ opacity: 0.8 }}>CRR: {crr}</ThemedText>
+                ) : (
+                    <ThemedText color="white" variant="small" style={{ opacity: 0.8 }}>Match Concluded</ThemedText>
+                )}
                 <ThemedText color="white" variant="small" style={{ opacity: 0.8 }} numberOfLines={1}>{toss}</ThemedText>
             </View>
         </View>
@@ -1065,7 +1119,7 @@ const AnimatedBall = ({ ball, isLast, theme, isDark }: { ball: any, isLast: bool
     );
 };
 
-const LiveTab = ({ matchId }: { matchId: string }) => {
+const LiveTab = ({ matchId, onTeamPress }: { matchId: string; onTeamPress: (index: 0 | 1) => void }) => {
     const { theme, isDark } = useTheme();
     const navigation = useNavigation<MatchDetailNavigationProp>();
     const dispatch = useAppDispatch();
@@ -1073,6 +1127,7 @@ const LiveTab = ({ matchId }: { matchId: string }) => {
     const {
         liveStatus,
         details: match,
+        squads,
         scorecard: reduxScorecard,
         sessions: sessionsData,
         partnerships: partnershipsData,
@@ -1212,6 +1267,67 @@ const LiveTab = ({ matchId }: { matchId: string }) => {
         setNewCategory(BET_CATEGORIES[0]);
         setNewSessionChoice('Yes');
     };
+
+    if (match?.status === 'scheduled') {
+        const matchDate = match?.matchDate ? new Date(match.matchDate) : null;
+        return (
+            <ScrollView
+                style={[styles.tabContent, { backgroundColor: theme.background }]}
+                contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl }}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing.liveStatus}
+                        onRefresh={onRefresh}
+                        colors={[theme.primary]}
+                        tintColor={theme.primary}
+                    />
+                }
+            >
+                <View style={{ alignItems: 'center', gap: spacing.lg }}>
+                    <View style={[styles.teamLogoBadge, { width: 80, height: 80, borderRadius: 40, backgroundColor: theme.primary + '20' }]}>
+                        <Ionicons name="calendar-outline" size={40} color={theme.primary} />
+                    </View>
+                    <View style={{ alignItems: 'center' }}>
+                        <ThemedText variant="subtitle" weight="bold">Match Not Started</ThemedText>
+                        <ThemedText color="textSecondary" align="center" style={{ marginTop: spacing.xs }}>
+                            Live scores, commentary, and ball-by-ball updates will be available once the match begins.
+                        </ThemedText>
+                    </View>
+
+                    {matchDate && (
+                        <Card style={{ paddingHorizontal: spacing.xl, paddingVertical: spacing.md, alignItems: 'center', borderColor: theme.border }}>
+                            <ThemedText variant="caption" color="textSecondary" weight="bold">STARTING AT</ThemedText>
+                            <ThemedText variant="title" weight="bold" color="primary" style={{ marginVertical: 4 }}>
+                                {matchDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
+                            </ThemedText>
+                            <ThemedText variant="small" weight="medium">
+                                {matchDate.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })}
+                            </ThemedText>
+                        </Card>
+                    )}
+
+                    <View style={{ width: '100%', gap: spacing.md, marginTop: spacing.md }}>
+                        <TeamSquadButton
+                            squad={resolveSquad(squads, match?.teamAId, 0)}
+                            team={match?.teamAId}
+                            teamIndex={0}
+                            onPress={onTeamPress}
+                            isDark={isDark}
+                            theme={theme}
+                        />
+                        <TeamSquadButton
+                            squad={resolveSquad(squads, match?.teamBId, 1)}
+                            team={match?.teamBId}
+                            teamIndex={1}
+                            onPress={onTeamPress}
+                            isDark={isDark}
+                            theme={theme}
+                        />
+                    </View>
+                </View>
+            </ScrollView>
+        );
+    }
 
     return (
         <View style={styles.tabContentContainer}>
@@ -2067,9 +2183,9 @@ export const MatchDetailScreen: React.FC = () => {
 
     const liveTab = useMemo(() => (
         <View style={{ flex: 1 }}>
-            <LiveTab matchId={matchId} />
+            <LiveTab matchId={matchId} onTeamPress={handleTeamPress} />
         </View>
-    ), [matchId]);
+    ), [matchId, handleTeamPress]);
 
     const fantasyTab = useMemo(() => (
         <FantasyTab onViewAll={handleFantasyViewAll} onAnalysis={handleAnalysisPress} />
@@ -2086,6 +2202,14 @@ export const MatchDetailScreen: React.FC = () => {
     const pointsTab = useMemo(() => (
         <PointsTableTab seriesId={match?.seriesId?._id} />
     ), [match?.seriesId?._id]);
+
+    // Determine initial route based on match status
+    const initialRouteName = useMemo(() => {
+        if (match?.status === 'live') return 'Live';
+        if (match?.status === 'completed') return 'Scorecard';
+        // 'scheduled' or fallback
+        return 'Info';
+    }, [match?.status]);
 
     // ─── Skeleton while match data loads ────────────────────────────────────────
     if (!match) {
@@ -2127,6 +2251,7 @@ export const MatchDetailScreen: React.FC = () => {
 
             {/* Tabs section with custom tabBar to include common score header */}
             <Tab.Navigator
+                initialRouteName={initialRouteName}
                 tabBar={(props) => (
                     <View>
                         <MaterialTopTabBar {...props} />

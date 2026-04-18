@@ -135,7 +135,7 @@ const AppNavigator = () => {
           fontSize: fontSize.lg,
           fontWeight: '600',
         },
-        gestureEnabled: true,
+        gestureEnabled: false,
         gestureDirection: 'horizontal',
         cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
       }}
