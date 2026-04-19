@@ -84,7 +84,8 @@ export const MatchService = {
     try {
       const params = inningNumber ? `?inningNumber=${inningNumber}` : '';
       const response = await axiosInstance.get(`/app/matches/${matchId}/partnerships${params}`);
-      return response.data?.data?.result ?? response.data?.result ?? response.data;
+      const result = response.data?.data?.result ?? response.data?.result ?? response.data;
+      return Array.isArray(result) ? result : [];
     } catch (error) {
       console.error(`Error fetching partnerships for match ${matchId}:`, error);
       return [];
@@ -122,7 +123,8 @@ export const MatchService = {
   getSessions: async (matchId: string) => {
     try {
       const response = await axiosInstance.get(`/app/matches/${matchId}/sessions`);
-      return response.data?.data?.result ?? response.data?.result ?? response.data;
+      const result = response.data?.data?.result ?? response.data?.result ?? response.data;
+      return Array.isArray(result) ? result : [];
     } catch (error) {
       console.error(`Error fetching sessions for match ${matchId}:`, error);
       return [];
@@ -136,6 +138,17 @@ export const MatchService = {
       return Array.isArray(data) ? data : [];
     } catch (error) {
       console.error(`Error fetching commentary for match ${matchId}:`, error);
+      return [];
+    }
+  },
+
+  getMatchAnalytics: async (matchId: string) => {
+    try {
+      const response = await axiosInstance.get(`/app/matches/${matchId}/analytics`);
+      const result = response.data?.data?.result ?? response.data?.result ?? response.data?.data ?? response.data;
+      return Array.isArray(result) ? result : [];
+    } catch (error) {
+      console.error(`Error fetching analytics for match ${matchId}:`, error);
       return [];
     }
   },

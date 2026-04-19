@@ -15,6 +15,7 @@ import {
     FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Rect, Line, Circle, Polyline, G, Text as SvgText, Path } from 'react-native-svg';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -37,6 +38,7 @@ import {
     fetchPointsTable,
     fetchPartnerships,
     fetchRecentOvers,
+    fetchMatchAnalytics,
     resetMatchState,
     setRefreshing,
     updateLiveStatusFromSocket,
@@ -359,10 +361,24 @@ const CommentaryTab = ({ matchId }: { matchId: string }) => {
             return [...fallback].reverse(); // Assuming recentBalls are newest-last in backend
         }
 
-        const combined = [...baseList].map((item, idx) => ({
-            ...item,
-            _id: item._id || item.ballId || `temp-${idx}`
-        }));
+        const combined = [...baseList].map((item, idx) => {
+            const label = item.ballLabel || '';
+            let r = Number(item.runs);
+            
+            // Normalize runs from label if missing
+            if (isNaN(r) || r === 0) {
+                if (label.includes('6')) r = 6;
+                else if (label.includes('4')) r = 4;
+                else if (['1', '2', '3'].includes(label)) r = Number(label);
+            }
+
+            return {
+                ...item,
+                _id: item._id || item.ballId || `temp-${idx}`,
+                runs: r,
+                isWicket: item.isWicket || item.type === 'wicket' || label.includes('W'),
+            };
+        });
 
         // 1. Sort by timestamp ascending for sequential index calculation
         const sorted = combined.sort((a, b) =>
@@ -402,31 +418,48 @@ const CommentaryTab = ({ matchId }: { matchId: string }) => {
     const filteredCommentary = useMemo(() => {
         if (activeFilter === 'All') return processedCommentary;
 
-        const inn1Id = match?.liveStatus?.innings?.[0]?._id;
-        const inn2Id = match?.liveStatus?.innings?.[1]?._id;
+        const inn1 = match?.liveStatus?.innings?.[0] || match?.innings?.[0];
+        const inn2 = match?.liveStatus?.innings?.[1] || match?.innings?.[1];
+        const inn1IdStr = (inn1?._id || inn1?.id || '').toString();
+        const inn2IdStr = (inn2?._id || inn2?.id || '').toString();
 
         return processedCommentary.filter((item: any) => {
             const isBall = ['ball', 'wicket', 'milestone'].includes(item.type);
+            const lowerComm = (item.commentary || '').toLowerCase();
+            const runs = Number(item.runs || 0);
 
             switch (activeFilter) {
                 case 'Highlights':
-                    return item.isWicket || item.runs >= 4 || item.type === 'milestone' || item.type === 'over_end';
+                    const isMilestone = item.type === 'milestone' || 
+                        lowerComm.includes('50') || 
+                        lowerComm.includes('100') || 
+                        lowerComm.includes('century') || 
+                        lowerComm.includes('half-century') ||
+                        lowerComm.includes('fifty') ||
+                        lowerComm.includes('5-wicket');
+                    return item.isWicket || runs >= 4 || isMilestone || item.type === 'over_end';
                 case 'W':
                     return item.isWicket || item.type === 'wicket';
                 case '6s':
-                    return item.runs === 6;
+                    return runs === 6;
                 case '4s':
-                    return item.runs === 4;
+                    return runs === 4;
                 case 'Milestones':
-                    return item.type === 'milestone';
+                    return item.type === 'milestone' || 
+                        lowerComm.includes('50') || 
+                        lowerComm.includes('100') || 
+                        lowerComm.includes('century') || 
+                        lowerComm.includes('half-century') ||
+                        lowerComm.includes('fifty') ||
+                        lowerComm.includes('milestone');
                 case 'Maiden':
-                    return item.type === 'over_end' && item.isMaiden;
+                    return item.type === 'over_end' && (item.isMaiden || Number(item.highlightData?.overSummaryRuns) === 0);
                 case '1st Inn':
-                    const inn1Id = match?.liveStatus?.innings?.[0]?._id || match?.innings?.[0]?._id;
-                    return item.inningId === inn1Id || item.inningNumber === 1;
+                    const itemInningId = (item.inningId || '').toString();
+                    return (inn1IdStr && itemInningId === inn1IdStr) || Number(item.inningNumber) === 1;
                 case '2nd Inn':
-                    const inn2Id = match?.liveStatus?.innings?.[1]?._id || match?.innings?.[1]?._id;
-                    return item.inningId === inn2Id || item.inningNumber === 2;
+                    const itemInningId2 = (item.inningId || '').toString();
+                    return (inn2IdStr && itemInningId2 === inn2IdStr) || Number(item.inningNumber) === 2;
                 case 'Overs':
                     return item.type === 'over_end';
                 default:
@@ -859,7 +892,7 @@ const ScorecardTab = ({ matchId }: { matchId: string }) => {
                 {batting.length === 0 && !loading && (
                     <ThemedText style={{ padding: spacing.md, textAlign: 'center' }} color="textSecondary">No batting records found.</ThemedText>
                 )}
-                {batting.map((player: any, idx: number) => (
+                {Array.isArray(batting) && batting.map((player: any, idx: number) => (
                     <View key={player.playerId?._id || player.playerId || `bat-${idx}`} style={[styles.playerRow, { borderBottomColor: theme.border + '50' }]}>
                         <View style={styles.playerNameCol}>
                             <ThemedText weight="semibold" style={{ color: theme.primary }}>{player.playerName || player.playerId?.name || 'Unknown'}</ThemedText>
@@ -888,7 +921,7 @@ const ScorecardTab = ({ matchId }: { matchId: string }) => {
                 {bowling.length === 0 && !loading && (
                     <ThemedText style={{ padding: spacing.md, textAlign: 'center' }} color="textSecondary">No bowling records found.</ThemedText>
                 )}
-                {bowling.map((bowler: any, idx: number) => (
+                {Array.isArray(bowling) && bowling.map((bowler: any, idx: number) => (
                     <View key={bowler.playerId?._id || bowler.playerId || `bowl-${idx}`} style={[styles.playerRow, { borderBottomColor: theme.border + '50' }]}>
                         <ThemedText weight="semibold" style={[styles.playerNameCol, { color: theme.text }]}>{bowler.playerName || bowler.playerId?.name || 'Unknown'}</ThemedText>
                         <View style={styles.scoreCols}>
@@ -907,7 +940,7 @@ const ScorecardTab = ({ matchId }: { matchId: string }) => {
                     <ThemedText style={{ padding: spacing.md, textAlign: 'center' }} color="textSecondary">No partnership records found.</ThemedText>
                 )}
                 <View style={{ paddingVertical: spacing.sm }}>
-                    {partnerships.map((part: any, idx: number) => {
+                    {Array.isArray(partnerships) && partnerships.map((part: any, idx: number) => {
                         const p1Name = part.batsman1Id?.shortName || part.batsman1Name || 'Batsman 1';
                         const p2Name = part.batsman2Id?.shortName || part.batsman2Name || 'Batsman 2';
                         const p1Runs = part.batsman1Runs || 0;
@@ -1354,7 +1387,7 @@ const LiveTab = ({ matchId, onTeamPress }: { matchId: string; onTeamPress: (inde
                             {recentBallsList.length > 0 ? (
                                 <>
                                     <ThemedText color="textSecondary" variant="small" style={{ marginRight: 8 }}>Recent:</ThemedText>
-                                    {recentBallsList.map((ball: any, bIdx: number) => {
+                                    {Array.isArray(recentBallsList) && recentBallsList.map((ball: any, bIdx: number) => {
                                         if (ball.type === 'over_start') {
                                             return (
                                                 <ThemedText key={`ostart-${bIdx}`} color="textSecondary" weight="bold" variant="small" style={{ marginRight: 4 }}>
@@ -1863,47 +1896,232 @@ const FantasyTab = ({ onViewAll, onAnalysis }: { onViewAll: () => void, onAnalys
     );
 };
 
+const ManhattanChart = ({ data, theme, teamCode, color }: { data: any[], theme: any, teamCode: string, color: string }) => {
+    if (!data || data.length === 0) return (
+        <View style={[styles.graphPlaceholder, { height: 160 }]}>
+            <ThemedText color="textSecondary">No data available yet</ThemedText>
+        </View>
+    );
+
+    const chartWidth = Dimensions.get('window').width - spacing.lg * 4;
+    const chartHeight = 150;
+    const maxRuns = Math.max(...data.map(o => o.runs), 10);
+    const barWidth = (chartWidth / Math.max(data.length, 20)) * 0.8;
+    const spacingX = chartWidth / Math.max(data.length, 20);
+
+    return (
+        <View style={{ marginVertical: spacing.md }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.xs }}>
+                <ThemedText variant="caption" weight="bold" style={{ color: color }}>{teamCode}</ThemedText>
+                <ThemedText variant="caption" color="textSecondary">Max: {maxRuns} Runs</ThemedText>
+            </View>
+            <Svg width={chartWidth} height={chartHeight}>
+                {/* Horizontal Grid Lines */}
+                {[0, 0.5, 1].map((v, i) => (
+                    <Line
+                        key={i}
+                        x1="0"
+                        y1={chartHeight * v}
+                        x2={chartWidth}
+                        y2={chartHeight * v}
+                        stroke={theme.border}
+                        strokeWidth="0.5"
+                        strokeDasharray="4,4"
+                    />
+                ))}
+
+                {Array.isArray(data) && data.map((over, index) => {
+                    const h = (over.runs / maxRuns) * chartHeight;
+                    const x = index * spacingX;
+                    return (
+                        <G key={index}>
+                            <Rect
+                                x={x}
+                                y={chartHeight - h}
+                                width={barWidth}
+                                height={h}
+                                fill={color}
+                                rx={2}
+                            />
+                            {over.wickets > 0 && Array.from({ length: over.wickets }).map((_, wIdx) => (
+                                <Circle
+                                    key={wIdx}
+                                    cx={x + barWidth / 2}
+                                    cy={chartHeight - h - (wIdx + 1) * 8}
+                                    r={3}
+                                    fill={theme.error}
+                                />
+                            ))}
+                        </G>
+                    );
+                })}
+            </Svg>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                <ThemedText variant="small" color="textSecondary">Over 1</ThemedText>
+                <ThemedText variant="small" color="textSecondary">Over {data.length}</ThemedText>
+            </View>
+        </View>
+    );
+};
+
+const WormChart = ({ analytics, theme, team1Code, team2Code }: { analytics: any[], theme: any, team1Code: string, team2Code: string }) => {
+    if (!analytics || analytics.length === 0) return null;
+
+    const chartWidth = Dimensions.get('window').width - spacing.lg * 4;
+    const chartHeight = 200;
+
+    const allScores = analytics.flatMap(inn => inn.overs.map((o: any) => o.cumulativeRuns));
+    const maxScore = Math.max(...allScores, 1);
+    const maxOvers = Math.max(...analytics.map(inn => inn.overs.length), 20);
+
+    const getPoints = (overs: any[]) => {
+        return overs.map((o, i) => {
+            const x = (i / (maxOvers - 1)) * chartWidth;
+            const y = chartHeight - (o.cumulativeRuns / maxScore) * chartHeight;
+            return `${x},${y}`;
+        }).join(' ');
+    };
+
+    return (
+        <View style={{ marginVertical: spacing.md }}>
+            <View style={{ flexDirection: 'row', gap: spacing.md, marginBottom: spacing.sm, justifyContent: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <View style={{ width: 12, height: 3, backgroundColor: theme.primary, borderRadius: 2 }} />
+                    <ThemedText variant="small" weight="medium">{team1Code}</ThemedText>
+                </View>
+                {analytics.length > 1 && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <View style={{ width: 12, height: 3, backgroundColor: theme.secondary, borderRadius: 2 }} />
+                        <ThemedText variant="small" weight="medium">{team2Code}</ThemedText>
+                    </View>
+                )}
+            </View>
+
+            <Svg width={chartWidth} height={chartHeight}>
+                 {/* Grid */}
+                 {[0, 0.25, 0.5, 0.75, 1].map((v, i) => (
+                    <Line
+                        key={i}
+                        x1="0"
+                        y1={chartHeight * v}
+                        x2={chartWidth}
+                        y2={chartHeight * v}
+                        stroke={theme.border}
+                        strokeWidth="0.5"
+                    />
+                ))}
+
+                {Array.isArray(analytics) && analytics.map((inn, idx) => (
+                    <Polyline
+                        key={idx}
+                        points={getPoints(inn.overs)}
+                        fill="none"
+                        stroke={idx === 0 ? theme.primary : theme.secondary}
+                        strokeWidth="2"
+                    />
+                ))}
+            </Svg>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                <ThemedText variant="small" color="textSecondary">Start</ThemedText>
+                <ThemedText variant="small" color="textSecondary">End</ThemedText>
+            </View>
+        </View>
+    );
+};
+
 const GraphsTab = () => {
     const { theme } = useTheme();
     const dispatch = useAppDispatch();
-    const { refreshing } = useAppSelector(state => state.match);
+    const { analytics, refreshing, details: match } = useAppSelector(state => state.match);
 
     const onRefresh = useCallback(() => {
-        dispatch(setRefreshing({ key: 'details', value: true }));
-        setTimeout(() => {
-            dispatch(setRefreshing({ key: 'details', value: false }));
-        }, 1000);
-    }, [dispatch]);
+        if (match?._id) {
+            dispatch(setRefreshing({ key: 'analytics', value: true }));
+            dispatch(fetchMatchAnalytics(match._id));
+        }
+    }, [dispatch, match?._id]);
+
+    const team1Code = match?.teamAId?.shortName || match?.teamAId?.code || 'T1';
+    const team2Code = match?.teamBId?.shortName || match?.teamBId?.code || 'T2';
+
+    const renderComparisonHeader = () => {
+        if (!analytics || analytics.length < 2) return null;
+        
+        const inn1 = analytics[0];
+        const inn2 = analytics[1];
+        const commonOver = Math.min(inn1.overs.length, inn2.overs.length);
+        
+        if (commonOver === 0) return null;
+
+        const over1 = inn1.overs[commonOver - 1];
+        const over2 = inn2.overs[commonOver - 1];
+
+        return (
+            <Card style={[styles.tabCard, { borderLeftWidth: 4, borderLeftColor: theme.primary }]}>
+                <ThemedText variant="subtitle" weight="bold">At This Stage (Over {commonOver})</ThemedText>
+                <View style={{ flexDirection: 'row', marginTop: spacing.md, justifyContent: 'space-around' }}>
+                    <View style={{ alignItems: 'center' }}>
+                        <ThemedText color="textSecondary" variant="small" weight="bold">{team1Code}</ThemedText>
+                        <ThemedText variant="title" weight="bold">{over1.cumulativeRuns}/{inn1.overs.reduce((acc: number, cur: any, idx: number) => idx < commonOver ? acc + cur.wickets : acc, 0)}</ThemedText>
+                        <ThemedText variant="caption" color="primary">RR: {(over1.cumulativeRuns / commonOver).toFixed(2)}</ThemedText>
+                    </View>
+                    <View style={{ width: 1, backgroundColor: theme.border }} />
+                    <View style={{ alignItems: 'center' }}>
+                        <ThemedText color="textSecondary" variant="small" weight="bold">{team2Code}</ThemedText>
+                        <ThemedText variant="title" weight="bold">{over2.cumulativeRuns}/{inn2.overs.reduce((acc: number, cur: any, idx: number) => idx < commonOver ? acc + cur.wickets : acc, 0)}</ThemedText>
+                        <ThemedText variant="caption" color="secondary">RR: {(over2.cumulativeRuns / commonOver).toFixed(2)}</ThemedText>
+                    </View>
+                </View>
+            </Card>
+        );
+    };
 
     return (
         <ScrollView
             style={[styles.tabContent, { backgroundColor: theme.background }]}
             refreshControl={
                 <RefreshControl
-                    refreshing={refreshing.details}
+                    refreshing={refreshing.analytics}
                     onRefresh={onRefresh}
                     colors={[theme.primary]}
                     tintColor={theme.primary}
                 />
             }
         >
+            {renderComparisonHeader()}
+
             <Card style={styles.tabCard}>
-                <ThemedText variant="subtitle" weight="bold" style={styles.cardTitle}>Run Rate Comparison</ThemedText>
-                <View style={styles.graphPlaceholder}>
-                    <Ionicons name="stats-chart" size={100} color={theme.primary + '30'} />
-                    <ThemedText color="textSecondary">Wagon Wheel & Run Rate Graphs</ThemedText>
-                </View>
+                <ThemedText variant="subtitle" weight="bold" style={styles.cardTitle}>Run Rate Worm</ThemedText>
+                <WormChart analytics={analytics || []} theme={theme} team1Code={team1Code} team2Code={team2Code} />
             </Card>
 
             <Card style={styles.tabCard}>
-                <ThemedText variant="subtitle" weight="bold" style={styles.cardTitle}>Manhattan Chart</ThemedText>
-                <View style={styles.manhattanContainer}>
-                    {[12, 8, 15, 4, 10, 6, 20, 14, 5, 9].map((val, idx) => (
-                        <View key={idx} style={[styles.manhattanBar, { height: val * 4, backgroundColor: theme.primary }]} />
-                    ))}
-                </View>
-                <ThemedText variant="caption" align="center" style={{ marginTop: 8 }}>Overs 41-50</ThemedText>
+                <ThemedText variant="subtitle" weight="bold" style={styles.cardTitle}>Manhattan - Run Rate per Over</ThemedText>
+                {analytics && analytics.length > 0 && (
+                    <ManhattanChart 
+                        data={analytics[0].overs} 
+                        theme={theme} 
+                        teamCode={team1Code} 
+                        color={theme.primary} 
+                    />
+                )}
+                {analytics && analytics.length > 1 && (
+                    <ManhattanChart 
+                        data={analytics[1].overs} 
+                        theme={theme} 
+                        teamCode={team2Code} 
+                        color={theme.secondary} 
+                    />
+                )}
+                {(!analytics || analytics.length === 0) && (
+                    <View style={styles.graphPlaceholder}>
+                        <Ionicons name="stats-chart" size={60} color={theme.primary + '30'} />
+                        <ThemedText color="textSecondary">Waiting for match data...</ThemedText>
+                    </View>
+                )}
             </Card>
+            
+            <View style={{ height: 40 }} />
         </ScrollView>
     );
 };
@@ -1972,7 +2190,7 @@ const PointsTableTab = ({ seriesId }: { seriesId: string }) => {
                     <ThemedText variant="small" weight="bold" style={styles.colNrrCompact}>NRR</ThemedText>
                     <ThemedText variant="small" weight="bold" style={styles.colStatMini}>PTS</ThemedText>
                 </View>
-                {pointsTable.map((item: any, idx: number) => {
+                {Array.isArray(pointsTable) && pointsTable.map((item: any, idx: number) => {
                     const team = item.teamId;
                     const nrr = Number(item.netRunRate || 0).toFixed(3);
                     const nrrPrefix = Number(nrr) > 0 ? '+' : '';
@@ -2054,6 +2272,7 @@ export const MatchDetailScreen: React.FC = () => {
         dispatch(fetchCommentary(matchId));
         dispatch(fetchScorecard({ matchId, inning: 1 }));
         dispatch(fetchScorecard({ matchId, inning: 2 }));
+        dispatch(fetchMatchAnalytics(matchId));
 
         return () => {
             dispatch(resetMatchState());
@@ -2097,6 +2316,7 @@ export const MatchDetailScreen: React.FC = () => {
             dispatch(fetchPartnerships({ matchId, inning: currentInning }));
             dispatch(fetchRecentOvers({ matchId, inning: currentInning }));
             dispatch(fetchSessions(matchId));
+            dispatch(fetchMatchAnalytics(matchId));
         }
     }, [ballData?._id, currentInning, matchId, dispatch]);
 

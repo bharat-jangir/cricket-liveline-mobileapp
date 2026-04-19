@@ -11,6 +11,7 @@ interface MatchState {
   sessions: any[];
   partnerships: any[];
   recentOvers: any | null;
+  analytics: any | null;
   loading: {
     details: boolean;
     liveStatus: boolean;
@@ -19,6 +20,9 @@ interface MatchState {
     squads: boolean;
     sessions: boolean;
     pointsTable: boolean;
+    analytics: boolean;
+    partnerships: boolean;
+    recentOvers: boolean;
   };
   refreshing: {
     details: boolean;
@@ -28,6 +32,7 @@ interface MatchState {
     pointsTable: boolean;
     partnerships: boolean;
     recentOvers: boolean;
+    analytics: boolean;
   };
   error: string | null;
 }
@@ -42,6 +47,7 @@ const initialState: MatchState = {
   sessions: [],
   partnerships: [],
   recentOvers: null,
+  analytics: null,
   loading: {
     details: false,
     liveStatus: false,
@@ -50,6 +56,9 @@ const initialState: MatchState = {
     squads: false,
     sessions: false,
     pointsTable: false,
+    analytics: false,
+    partnerships: false,
+    recentOvers: false,
   },
   refreshing: {
     details: false,
@@ -59,6 +68,7 @@ const initialState: MatchState = {
     pointsTable: false,
     partnerships: false,
     recentOvers: false,
+    analytics: false,
   },
   error: null,
 };
@@ -125,6 +135,13 @@ export const fetchRecentOvers = createAsyncThunk(
     'match/fetchRecentOvers',
     async ({ matchId, inning }: { matchId: string; inning: number }) => {
       return await MatchService.getRecentOvers(matchId, inning);
+    }
+);
+
+export const fetchMatchAnalytics = createAsyncThunk(
+    'match/fetchAnalytics',
+    async (matchId: string) => {
+      return await MatchService.getMatchAnalytics(matchId);
     }
 );
 
@@ -254,6 +271,20 @@ const matchSlice = createSlice({
     builder.addCase(fetchRecentOvers.rejected, (state) => {
         state.loading.recentOvers = false;
         state.refreshing.recentOvers = false;
+    });
+
+    // Analytics
+    builder.addCase(fetchMatchAnalytics.pending, (state) => {
+        state.loading.analytics = true;
+    });
+    builder.addCase(fetchMatchAnalytics.fulfilled, (state, action) => {
+        state.loading.analytics = false;
+        state.analytics = action.payload;
+        state.refreshing.analytics = false;
+    });
+    builder.addCase(fetchMatchAnalytics.rejected, (state) => {
+        state.loading.analytics = false;
+        state.refreshing.analytics = false;
     });
   },
 });
