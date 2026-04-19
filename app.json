@@ -5,9 +5,9 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "icon": "./assets/no-bg-logo.png",
+    "icon": "./assets/app-logo.png",
     "splash": {
-      "image": "./assets/no-bg-logo.png",
+      "image": "./assets/app-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#1e40af"
     },
@@ -19,7 +19,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/no-bg-logo.png",
+        "foregroundImage": "./assets/app-logo.png",
         "backgroundColor": "#1e40af"
       },
       "statusBar": {

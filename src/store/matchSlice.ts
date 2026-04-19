@@ -155,10 +155,169 @@ const matchSlice = createSlice({
     },
     // Prepare for socket updates
     updateLiveStatusFromSocket: (state, action: PayloadAction<any>) => {
-      state.liveStatus = { ...state.liveStatus, ...action.payload };
+      const payload = action.payload;
+      if (!state.liveStatus) {
+        state.liveStatus = payload;
+        return;
+      }
+
+      // Helper for ID extraction (Hex only)
+      const extractId = (id: any): string | null => {
+        if (!id) return null;
+        if (typeof id === 'string') {
+          // Robust regex to find hex ID even in stringified objects
+          const match = id.match(/[0-9a-fA-F]{24}/);
+          return match ? match[0] : id;
+        }
+        return id._id ? id._id.toString() : id.toString();
+      };
+
+      // 1. Root Level Updates (Flat fields)
+      if (payload.score !== undefined) state.liveStatus.score = payload.score;
+      if (payload.overs !== undefined) state.liveStatus.overs = payload.overs;
+      if (payload.runRate !== undefined) state.liveStatus.runRate = payload.runRate;
+      if (payload.currentInning !== undefined) state.liveStatus.currentInning = payload.currentInning;
+      if (payload.currentBall !== undefined) state.liveStatus.currentBall = payload.currentBall;
+      
+      // 2. Recent Balls Update (Socket now sends full last 3 overs strip)
+      if (payload.recentBalls !== undefined) {
+        state.liveStatus.recentBalls = payload.recentBalls;
+      }
+      
+      // 3. Active Player Stats (Full Objects for Live Tab)
+      if (payload.striker) {
+        state.liveStatus.striker = {
+          ...(state.liveStatus.striker || {}),
+          ...payload.striker,
+          playerName: payload.striker.name || payload.striker.playerName,
+          playerId: extractId(payload.striker.playerId)
+        };
+        state.liveStatus.currentStrikerId = state.liveStatus.striker.playerId;
+      }
+      if (payload.nonStriker) {
+        state.liveStatus.nonStriker = {
+          ...(state.liveStatus.nonStriker || {}),
+          ...payload.nonStriker,
+          playerName: payload.nonStriker.name || payload.nonStriker.playerName,
+          playerId: extractId(payload.nonStriker.playerId)
+        };
+        state.liveStatus.currentNonStrikerId = state.liveStatus.nonStriker.playerId;
+      }
+      if (payload.bowler) {
+        state.liveStatus.bowler = {
+          ...(state.liveStatus.bowler || {}),
+          ...payload.bowler,
+          playerName: payload.bowler.name || payload.bowler.playerName,
+          playerId: extractId(payload.bowler.playerId)
+        };
+        state.liveStatus.currentBowlerId = state.liveStatus.bowler.playerId;
+      }
+
+      // 4. Surgical Inning Merge
+      if (payload.inning) {
+        state.liveStatus.inning = {
+          ...(state.liveStatus.inning || {}),
+          ...payload.inning
+        };
+        // Re-calculate root fields if backend sent partial nesting
+        if (payload.inning.totalRuns !== undefined) {
+          state.liveStatus.score = `${payload.inning.totalRuns}/${payload.inning.wickets || payload.inning.totalWickets || 0}`;
+        }
+        if (payload.inning.overs !== undefined) {
+          state.liveStatus.overs = payload.inning.overs.toString();
+        }
+      }
+
+      // 4. Surgical Team Merge (PRESERVE NAME/LOGO/CODE)
+      if (payload.teamA) {
+        state.liveStatus.teamA = {
+          ...(state.liveStatus.teamA || {}),
+          ...payload.teamA
+        };
+      }
+      if (payload.teamB) {
+        state.liveStatus.teamB = {
+          ...(state.liveStatus.teamB || {}),
+          ...payload.teamB
+        };
+      }
+    },
+    updateInningFromSocket: (state, action: PayloadAction<any>) => {
+      const { inningNumber, battingTeamId, bowlingTeamId } = action.payload;
+      if (!state.liveStatus) return;
+      
+      state.liveStatus.currentInning = inningNumber;
+      if (battingTeamId) state.liveStatus.battingTeamId = battingTeamId;
+      if (bowlingTeamId) state.liveStatus.bowlingTeamId = bowlingTeamId;
+      
+      // Optionally clear recent balls or other state on new inning
+    },
+    updateOddsFromSocket: (state, action: PayloadAction<any>) => {
+      if (!state.liveStatus) return;
+      const p = action.payload;
+      
+      // Surgical merge for odds
+      const fields = ['oddsTeam', 'oddsBlue', 'oddsRed', 'session', 'sessionBlue', 'sessionRed', 'lambi', 'lambiBlue', 'lambiRed'];
+      fields.forEach(f => {
+        if (p[f] !== undefined) state.liveStatus[f] = p[f];
+      });
+    },
+    updatePowerplayFromSocket: (state, action: PayloadAction<any>) => {
+      if (!state.liveStatus) return;
+      if (action.payload.onOC !== undefined) state.liveStatus.onOC = action.payload.onOC;
+      if (action.payload.powerplayOvers !== undefined) state.liveStatus.powerplayOvers = action.payload.powerplayOvers;
     },
     updateCommentaryFromSocket: (state, action: PayloadAction<any>) => {
       state.commentary = [action.payload, ...state.commentary].slice(0, 100);
+    },
+    updateScorecardFromSocket: (state, action: PayloadAction<any>) => {
+      const payload = action.payload;
+      if (payload && payload.inningNumber) {
+        const current = state.scorecard[payload.inningNumber] || { batting: [], bowling: [], inning: {} };
+        
+        // Surgical merge for Batting
+        const existingBatting = Array.isArray(current.batting) ? [...current.batting] : [];
+        (payload.batting || []).forEach((newB: any) => {
+           const newId = (newB.playerId?._id || newB.playerId)?.toString();
+           const idx = existingBatting.findIndex((ex: any) => 
+               (ex.playerId?._id || ex.playerId)?.toString() === newId
+           );
+           
+           if (idx !== -1) {
+             existingBatting[idx] = { ...existingBatting[idx], ...newB, playerName: newB.name || existingBatting[idx].playerName };
+           } else {
+             existingBatting.push({ ...newB, playerName: newB.name });
+           }
+        });
+
+        // Surgical merge for Bowling
+        const existingBowling = Array.isArray(current.bowling) ? [...current.bowling] : [];
+        (payload.bowling || []).forEach((newB: any) => {
+           const newId = (newB.playerId?._id || newB.playerId)?.toString();
+           const idx = existingBowling.findIndex((ex: any) => 
+               (ex.playerId?._id || ex.playerId)?.toString() === newId
+           );
+           
+           if (idx !== -1) {
+             existingBowling[idx] = { ...existingBowling[idx], ...newB, playerName: newB.name || existingBowling[idx].playerName };
+           } else {
+             existingBowling.push({ ...newB, playerName: newB.name });
+           }
+        });
+
+        state.scorecard[payload.inningNumber] = {
+            ...current,
+            batting: existingBatting,
+            bowling: existingBowling,
+            inning: {
+                ...current.inning,
+                extras: payload.extras?.total !== undefined ? payload.extras.total : current.inning?.extras || 0,
+                totalRuns: payload.totalRuns !== undefined ? payload.totalRuns : current.inning?.totalRuns,
+                totalWickets: payload.wickets !== undefined ? payload.wickets : current.inning?.totalWickets,
+                runRate: payload.runRate || current.inning?.runRate,
+            }
+        };
+      }
     },
   },
   extraReducers: (builder) => {
@@ -293,7 +452,11 @@ export const {
     resetMatchState, 
     setRefreshing, 
     updateLiveStatusFromSocket, 
-    updateCommentaryFromSocket 
+    updateInningFromSocket,
+    updateOddsFromSocket,
+    updatePowerplayFromSocket,
+    updateCommentaryFromSocket,
+    updateScorecardFromSocket
 } = matchSlice.actions;
 
 export default matchSlice.reducer;

@@ -358,7 +358,12 @@ const CommentaryTab = ({ matchId }: { matchId: string }) => {
             // Fallback to liveStatus.recentBalls if REST is empty
             const fallback = liveStatus?.recentBalls || [];
             if (fallback.length === 0) return [];
-            return [...fallback].reverse(); // Assuming recentBalls are newest-last in backend
+            // Map to add temporary keys for unique rendering
+            return [...fallback].reverse().map((item, idx) => ({
+                ...item,
+                _id: item._id || item.ballId || `fallback-${idx}`,
+                timestamp: item.timestamp || new Date()
+            }));
         }
 
         const combined = [...baseList].map((item, idx) => {
@@ -603,14 +608,14 @@ const CommentaryTab = ({ matchId }: { matchId: string }) => {
         <View style={{ flex: 1, backgroundColor: theme.background }}>
             {/* Filter Bar */}
             <View style={[styles.filterScrollContainer, { borderBottomColor: theme.border + '20' }]}>
-                <FlatList
-                    data={filters}
+                <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}
-                    keyExtractor={item => item}
-                    renderItem={({ item: filter }) => (
+                >
+                    {filters.map((filter) => (
                         <TouchableOpacity
+                            key={filter}
                             style={[
                                 styles.filterChip,
                                 { backgroundColor: isDark ? theme.surface : '#f1f5f9' },
@@ -626,8 +631,8 @@ const CommentaryTab = ({ matchId }: { matchId: string }) => {
                                 {filter}
                             </ThemedText>
                         </TouchableOpacity>
-                    )}
-                />
+                    ))}
+                </ScrollView>
             </View>
 
             <ScrollView
@@ -844,6 +849,24 @@ const ScorecardTab = ({ matchId }: { matchId: string }) => {
     const { partnerships: partnershipsData } = useAppSelector(state => state.match);
     const partnerships = useMemo(() => partnershipsData || [], [partnershipsData]);
 
+    const currentStrikerIdStr = liveStatus?.currentStrikerId?.toString();
+    const currentNonStrikerIdStr = liveStatus?.currentNonStrikerId?.toString();
+    const currentBowlerIdStr = liveStatus?.currentBowlerId?.toString();
+
+    // Merge live data into scorecard for immediate updates
+    const battingWithLive = useMemo(() => {
+        return batting.map((p: any) => {
+            const pId = (p.playerId?._id || p.playerId || '').toString();
+            if (pId === currentStrikerIdStr && liveStatus?.striker) {
+                return { ...p, runs: liveStatus.striker.runs, balls: liveStatus.striker.balls, fours: liveStatus.striker.fours, sixes: liveStatus.striker.sixes };
+            }
+            if (pId === currentNonStrikerIdStr && liveStatus?.nonStriker) {
+                return { ...p, runs: liveStatus.nonStriker.runs, balls: liveStatus.nonStriker.balls, fours: liveStatus.nonStriker.fours, sixes: liveStatus.nonStriker.sixes };
+            }
+            return p;
+        });
+    }, [batting, currentStrikerIdStr, currentNonStrikerIdStr, liveStatus?.striker, liveStatus?.nonStriker]);
+
     return (
         <ScrollView
             style={[styles.tabContent, { backgroundColor: theme.background }]}
@@ -883,55 +906,74 @@ const ScorecardTab = ({ matchId }: { matchId: string }) => {
                 <View style={[styles.scorecardHeader, { borderBottomColor: theme.border }]}>
                     <ThemedText variant="small" weight="bold" style={styles.colName}>Batting</ThemedText>
                     <View style={styles.scoreCols}>
-                        <ThemedText variant="small" weight="bold" style={styles.colStat}>R</ThemedText>
-                        <ThemedText variant="small" weight="bold" style={styles.colStat}>B</ThemedText>
-                        <ThemedText variant="small" weight="bold" style={styles.colStat}>4s</ThemedText>
-                        <ThemedText variant="small" weight="bold" style={styles.colStat}>6s</ThemedText>
+                        <View style={styles.colStatFixed}><ThemedText variant="small" weight="bold" style={{ textAlign: 'center' }}>R</ThemedText></View>
+                        <View style={styles.colStatFixed}><ThemedText variant="small" weight="bold" style={{ textAlign: 'center' }}>B</ThemedText></View>
+                        <View style={styles.colStatFixed}><ThemedText variant="small" weight="bold" style={{ textAlign: 'center' }}>4s</ThemedText></View>
+                        <View style={styles.colStatFixed}><ThemedText variant="small" weight="bold" style={{ textAlign: 'center' }}>6s</ThemedText></View>
                     </View>
                 </View>
-                {batting.length === 0 && !loading && (
+                {battingWithLive.length === 0 && !loading && (
                     <ThemedText style={{ padding: spacing.md, textAlign: 'center' }} color="textSecondary">No batting records found.</ThemedText>
                 )}
-                {Array.isArray(batting) && batting.map((player: any, idx: number) => (
-                    <View key={player.playerId?._id || player.playerId || `bat-${idx}`} style={[styles.playerRow, { borderBottomColor: theme.border + '50' }]}>
-                        <View style={styles.playerNameCol}>
-                            <ThemedText weight="semibold" style={{ color: theme.primary }}>{player.playerName || player.playerId?.name || 'Unknown'}</ThemedText>
-                            <ThemedText variant="caption" color="textSecondary">{player.dismissalText || 'not out'}</ThemedText>
+                {Array.isArray(battingWithLive) && battingWithLive.map((player: any, idx: number) => {
+                    const pId = (player.playerId?._id || player.playerId || '').toString();
+                    const isStriker = pId === currentStrikerIdStr;
+                    
+                    return (
+                        <View key={pId || `bat-${idx}`} style={[styles.playerRow, { borderBottomColor: theme.border + '50' }]}>
+                            <View style={styles.playerNameCol}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                    <ThemedText weight="semibold" style={{ color: isStriker ? theme.primary : theme.text }}>
+                                        {player.playerName || player.playerId?.name || 'Unknown'}
+                                    </ThemedText>
+                                    {isStriker && <Ionicons name="flashlight" size={12} color={theme.primary} style={styles.batIconSmall} />}
+                                </View>
+                                <ThemedText variant="caption" color="textSecondary">{player.dismissalText || 'not out'}</ThemedText>
+                            </View>
+                            <View style={styles.scoreCols}>
+                                <View style={styles.colStatFixed}><ThemedText weight="bold" style={{ textAlign: 'center' }}>{player.runs || 0}</ThemedText></View>
+                                <View style={styles.colStatFixed}><ThemedText variant="small" style={{ textAlign: 'center' }}>{player.balls || 0}</ThemedText></View>
+                                <View style={styles.colStatFixed}><ThemedText variant="small" style={{ textAlign: 'center' }}>{player.fours || 0}</ThemedText></View>
+                                <View style={styles.colStatFixed}><ThemedText variant="small" style={{ textAlign: 'center' }}>{player.sixes || 0}</ThemedText></View>
+                            </View>
                         </View>
-                        <View style={styles.scoreCols}>
-                            <ThemedText weight="bold" style={styles.colStat}>{player.runs || 0}</ThemedText>
-                            <ThemedText variant="small" style={styles.colStat}>{player.balls || 0}</ThemedText>
-                            <ThemedText variant="small" style={styles.colStat}>{player.fours || 0}</ThemedText>
-                            <ThemedText variant="small" style={styles.colStat}>{player.sixes || 0}</ThemedText>
-                        </View>
-                    </View>
-                ))}
+                    );
+                })}
             </Card>
 
             <Card style={styles.tabCard}>
                 <View style={styles.scorecardHeader}>
                     <ThemedText variant="small" weight="bold" style={styles.colName}>Bowling</ThemedText>
                     <View style={styles.scoreCols}>
-                        <ThemedText variant="small" weight="bold" style={styles.colStat}>O</ThemedText>
-                        <ThemedText variant="small" weight="bold" style={styles.colStat}>M</ThemedText>
-                        <ThemedText variant="small" weight="bold" style={styles.colStat}>R</ThemedText>
-                        <ThemedText variant="small" weight="bold" style={styles.colStat}>W</ThemedText>
+                        <View style={styles.colStatFixed}><ThemedText variant="small" weight="bold" style={{ textAlign: 'center' }}>O</ThemedText></View>
+                        <View style={styles.colStatFixed}><ThemedText variant="small" weight="bold" style={{ textAlign: 'center' }}>M</ThemedText></View>
+                        <View style={styles.colStatFixed}><ThemedText variant="small" weight="bold" style={{ textAlign: 'center' }}>R</ThemedText></View>
+                        <View style={styles.colStatFixed}><ThemedText variant="small" weight="bold" style={{ textAlign: 'center' }}>W</ThemedText></View>
                     </View>
                 </View>
                 {bowling.length === 0 && !loading && (
                     <ThemedText style={{ padding: spacing.md, textAlign: 'center' }} color="textSecondary">No bowling records found.</ThemedText>
                 )}
-                {Array.isArray(bowling) && bowling.map((bowler: any, idx: number) => (
-                    <View key={bowler.playerId?._id || bowler.playerId || `bowl-${idx}`} style={[styles.playerRow, { borderBottomColor: theme.border + '50' }]}>
-                        <ThemedText weight="semibold" style={[styles.playerNameCol, { color: theme.text }]}>{bowler.playerName || bowler.playerId?.name || 'Unknown'}</ThemedText>
-                        <View style={styles.scoreCols}>
-                            <ThemedText variant="small" style={styles.colStat}>{bowler.overs || '0.0'}</ThemedText>
-                            <ThemedText variant="small" style={styles.colStat}>{bowler.maidens || 0}</ThemedText>
-                            <ThemedText variant="small" style={styles.colStat}>{bowler.runs || 0}</ThemedText>
-                            <ThemedText weight="bold" style={styles.colStat}>{bowler.wickets || 0}</ThemedText>
+                {Array.isArray(bowling) && bowling.map((bowler: any, idx: number) => {
+                    const pId = (bowler.playerId?._id || bowler.playerId || '').toString();
+                    const isBowler = pId === currentBowlerIdStr;
+
+                    return (
+                        <View key={pId || `bowl-${idx}`} style={[styles.playerRow, { borderBottomColor: theme.border + '50' }]}>
+                            <View style={styles.playerNameCol}>
+                                <ThemedText weight="semibold" style={{ color: isBowler ? theme.primary : theme.text }}>
+                                    {bowler.playerName || bowler.playerId?.name || 'Unknown'}
+                                </ThemedText>
+                            </View>
+                            <View style={styles.scoreCols}>
+                                <View style={styles.colStatFixed}><ThemedText variant="small" style={{ textAlign: 'center' }}>{bowler.overs || '0.0'}</ThemedText></View>
+                                <View style={styles.colStatFixed}><ThemedText variant="small" style={{ textAlign: 'center' }}>{bowler.maidens || 0}</ThemedText></View>
+                                <View style={styles.colStatFixed}><ThemedText variant="small" style={{ textAlign: 'center' }}>{bowler.runs || 0}</ThemedText></View>
+                                <View style={styles.colStatFixed}><ThemedText weight="bold" style={{ textAlign: 'center' }}>{bowler.wickets || 0}</ThemedText></View>
+                            </View>
                         </View>
-                    </View>
-                ))}
+                    );
+                })}
             </Card>
 
             <Card style={styles.tabCard}>
@@ -979,7 +1021,7 @@ const ScorecardTab = ({ matchId }: { matchId: string }) => {
     );
 };
 
-const ScoreSummaryHeader = ({ liveStatus, match }: { liveStatus: any, match: any }) => {
+const ScoreSummaryHeader = ({ liveStatus, match, isConnected }: { liveStatus: any, match: any, isConnected?: boolean }) => {
     const { theme, isDark } = useTheme();
     const headerBg = isDark ? theme.surface : theme.primary;
 
@@ -1024,6 +1066,12 @@ const ScoreSummaryHeader = ({ liveStatus, match }: { liveStatus: any, match: any
                     <View style={styles.scoreTextsBlock}>
                         <View style={styles.teamCodeRow}>
                             <ThemedText weight="bold" color="white" style={styles.teamCodeText}>{teamCode}</ThemedText>
+                            {isConnected && !isScheduled && !isCompleted && (
+                                <View style={[styles.p1Badge, { backgroundColor: '#22c55e', flexDirection: 'row', alignItems: 'center', gap: 3 }]}>
+                                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: 'white' }} />
+                                    <ThemedText color="white" weight="bold" style={styles.p1BadgeText}>LIVE</ThemedText>
+                                </View>
+                            )}
                             {isScheduled && (
                                 <View style={[styles.p1Badge, { backgroundColor: '#f59e0b' }]}>
                                     <ThemedText color="white" weight="bold" style={styles.p1BadgeText}>UPCOMING</ThemedText>
@@ -1187,21 +1235,51 @@ const LiveTab = ({ matchId, onTeamPress }: { matchId: string; onTeamPress: (inde
     const partnerships = partnershipsData || [];
     const recentOvers = recentOversData || [];
 
-    // Derived stats for players
+    // Derived stats for players (Prefer LIVE socket objects)
     const striker = useMemo(() => {
+        // 1. Try Live Object from socket first
+        if (liveStatus?.striker) return liveStatus.striker;
+        
+        // 2. Fallback to Scorecard lookup
         const sid = liveStatus?.currentStrikerId?._id || liveStatus?.currentStrikerId;
-        return currentScorecard?.batting?.find((p: any) => (p.playerId?._id || p.playerId) === sid) || null;
-    }, [currentScorecard, liveStatus?.currentStrikerId]);
-
+        const sidStr = sid?.toString();
+        return currentScorecard?.batting?.find((p: any) => (p.playerId?._id || p.playerId)?.toString() === sidStr) || null;
+    }, [currentScorecard, liveStatus?.currentStrikerId, liveStatus?.striker]);
+ 
     const nonStriker = useMemo(() => {
-        const nsid = liveStatus?.currentNonStrikerId?._id || liveStatus?.currentNonStrikerId;
-        return currentScorecard?.batting?.find((p: any) => (p.playerId?._id || p.playerId) === nsid) || null;
-    }, [currentScorecard, liveStatus?.currentNonStrikerId]);
+        if (liveStatus?.nonStriker) return liveStatus.nonStriker;
 
+        const nsid = liveStatus?.currentNonStrikerId?._id || liveStatus?.currentNonStrikerId;
+        const nsidStr = nsid?.toString();
+        return currentScorecard?.batting?.find((p: any) => (p.playerId?._id || p.playerId)?.toString() === nsidStr) || null;
+    }, [currentScorecard, liveStatus?.currentNonStrikerId, liveStatus?.nonStriker]);
+ 
     const bowler = useMemo(() => {
+        if (liveStatus?.bowler) return liveStatus.bowler;
+
         const bid = liveStatus?.currentBowlerId?._id || liveStatus?.currentBowlerId;
-        return currentScorecard?.bowling?.find((p: any) => (p.playerId?._id || p.playerId) === bid) || null;
-    }, [currentScorecard, liveStatus?.currentBowlerId]);
+        const bidStr = bid?.toString();
+        return currentScorecard?.bowling?.find((p: any) => (p.playerId?._id || p.playerId)?.toString() === bidStr) || null;
+    }, [currentScorecard, liveStatus?.currentBowlerId, liveStatus?.bowler]);
+
+    // Stable list of active batters to prevent UI "jumping" when strike changes
+    const activeBatters = useMemo(() => {
+        const list = [];
+        if (striker) list.push(striker);
+        if (nonStriker) list.push(nonStriker);
+        
+        // Sort by playerId string for stable fixed position
+        return list.sort((a, b) => {
+            const idA = (a.playerId?._id || a.playerId || '').toString();
+            const idB = (b.playerId?._id || b.playerId || '').toString();
+            return idA.localeCompare(idB);
+        });
+    }, [striker, nonStriker]);
+
+    const currentStrikerIdStr = useMemo(() => {
+        const sid = liveStatus?.currentStrikerId?._id || liveStatus?.currentStrikerId;
+        return sid?.toString();
+    }, [liveStatus?.currentStrikerId]);
 
     const currentPship = useMemo(() => {
         if (!partnerships || partnerships.length === 0) return null;
@@ -1387,17 +1465,17 @@ const LiveTab = ({ matchId, onTeamPress }: { matchId: string; onTeamPress: (inde
                             {recentBallsList.length > 0 ? (
                                 <>
                                     <ThemedText color="textSecondary" variant="small" style={{ marginRight: 8 }}>Recent:</ThemedText>
-                                    {Array.isArray(recentBallsList) && recentBallsList.map((ball: any, bIdx: number) => {
+                                    {recentBallsList.map((ball: any, bIdx: number) => {
                                         if (ball.type === 'over_start') {
                                             return (
-                                                <ThemedText key={`ostart-${bIdx}`} color="textSecondary" weight="bold" variant="small" style={{ marginRight: 4 }}>
+                                                <ThemedText key={ball.ballId || `ostart-${bIdx}`} color="textSecondary" weight="bold" variant="small" style={{ marginRight: 4 }}>
                                                     {`Ov ${ball.overNumber}:`}
                                                 </ThemedText>
                                             );
                                         }
                                         if (ball.type === 'over_summary') {
                                             return (
-                                                <View key={`os-${bIdx}`} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                <View key={ball.ballId || `os-${bIdx}`} style={{ flexDirection: 'row', alignItems: 'center' }}>
                                                     <View style={[styles.overSummaryMarker, { backgroundColor: theme.primaryLight + '25', borderWidth: 1, borderColor: theme.primaryLight + '40' }]}>
                                                         <ThemedText color="primaryDark" weight="bold" variant="small">
                                                             {` = ${ball.runs} `}
@@ -1409,7 +1487,7 @@ const LiveTab = ({ matchId, onTeamPress }: { matchId: string; onTeamPress: (inde
                                         }
                                         return (
                                             <AnimatedBall
-                                                key={`${bIdx}-${ball.ballId || bIdx}`}
+                                                key={ball.ballId || `${bIdx}-${ball.ballId || bIdx}`}
                                                 ball={ball}
                                                 isLast={bIdx === lastBallIndex}
                                                 theme={theme}
@@ -1510,29 +1588,33 @@ const LiveTab = ({ matchId, onTeamPress }: { matchId: string; onTeamPress: (inde
                         <ThemedText variant="caption" color="textSecondary" style={styles.colStatSmall}>SR</ThemedText>
                     </View>
 
-                    {striker ? (
-                        <View style={[styles.tableRow, { borderBottomColor: theme.border }]}>
-                            <View style={[styles.colBatter, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
-                                <ThemedText weight="bold" style={{ color: theme.primary }}>{striker.playerName || striker.playerId?.name || 'Striker'}</ThemedText>
-                                <Ionicons name="flashlight" size={12} color={theme.primary} style={styles.batIconSmall} />
-                            </View>
-                            <ThemedText weight="medium" style={styles.colStatSmall}>{striker.runs || 0} ({striker.balls || 0})</ThemedText>
-                            <ThemedText style={styles.colStatSmall}>{striker.fours || 0}</ThemedText>
-                            <ThemedText style={styles.colStatSmall}>{striker.sixes || 0}</ThemedText>
-                            <ThemedText style={styles.colStatSmall}>{formatSR(striker.runs, striker.balls)}</ThemedText>
-                        </View>
+                    {activeBatters.length > 0 ? (
+                        activeBatters.map((player: any) => {
+                            const pId = (player.playerId?._id || player.playerId || '').toString();
+                            const isStriker = pId === currentStrikerIdStr;
+                            
+                            return (
+                                <View key={pId} style={[styles.tableRow, { borderBottomColor: theme.border }]}>
+                                    <View style={[styles.colBatter, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                                        <ThemedText 
+                                            weight="bold" 
+                                            style={{ color: isStriker ? theme.primary : (isDark ? 'rgba(255,255,255,0.7)' : theme.textSecondary) }}
+                                        >
+                                            {player.playerName || player.name || player.playerId?.name || 'Player'}
+                                        </ThemedText>
+                                        {isStriker && <Ionicons name="flashlight" size={12} color={theme.primary} style={styles.batIconSmall} />}
+                                    </View>
+                                    <ThemedText weight="medium" style={styles.colStatSmall} color={isStriker ? 'text' : 'textSecondary'}>
+                                        {player.runs || 0} ({player.balls || 0})
+                                    </ThemedText>
+                                    <ThemedText style={styles.colStatSmall} color={isStriker ? 'text' : 'textSecondary'}>{player.fours || 0}</ThemedText>
+                                    <ThemedText style={styles.colStatSmall} color={isStriker ? 'text' : 'textSecondary'}>{player.sixes || 0}</ThemedText>
+                                    <ThemedText style={styles.colStatSmall} color={isStriker ? 'text' : 'textSecondary'}>{formatSR(player.runs, player.balls)}</ThemedText>
+                                </View>
+                            );
+                        })
                     ) : (
-                        <ThemedText style={{ padding: spacing.sm, textAlign: 'center' }} color="textSecondary">No Striker Active</ThemedText>
-                    )}
-
-                    {nonStriker && (
-                        <View style={[styles.tableRow, { borderBottomColor: theme.border }]}>
-                            <ThemedText weight="bold" style={styles.colBatter} color="textSecondary">{nonStriker.playerName || nonStriker.playerId?.name || 'Non-Striker'}</ThemedText>
-                            <ThemedText weight="medium" style={styles.colStatSmall}>{nonStriker.runs || 0} ({nonStriker.balls || 0})</ThemedText>
-                            <ThemedText style={styles.colStatSmall}>{nonStriker.fours || 0}</ThemedText>
-                            <ThemedText style={styles.colStatSmall}>{nonStriker.sixes || 0}</ThemedText>
-                            <ThemedText style={styles.colStatSmall}>{formatSR(nonStriker.runs, nonStriker.balls)}</ThemedText>
-                        </View>
+                        <ThemedText style={{ padding: spacing.sm, textAlign: 'center' }} color="textSecondary">No Batters Active</ThemedText>
                     )}
                 </View>
 
@@ -1566,7 +1648,6 @@ const LiveTab = ({ matchId, onTeamPress }: { matchId: string; onTeamPress: (inde
                         <ThemedText style={{ padding: spacing.sm, textAlign: 'center' }} color="textSecondary">No Bowler Active</ThemedText>
                     )}
                 </View>
-
 
                 {/* Projected Score Table */}
                 <View style={[styles.projectedSection, { backgroundColor: isDark ? theme.surface : theme.borderLight, borderTopColor: theme.border, borderTopWidth: 1 }]}>
@@ -2287,38 +2368,54 @@ export const MatchDetailScreen: React.FC = () => {
         }
     }, [match?.seriesId, dispatch]);
 
-    // Live socket data
-    const { matchStatus, ballData, commentary: socketCommentary, isConnected } = useLiveMatch(matchId);
+    // Live socket data — rich per-event updates
+    const {
+        matchUpdate,
+        scorecardDelta,
+        latestCommentary,
+        prependCommentary,
+        isConnected,
+    } = useLiveMatch(matchId);
 
-    // Sync socket updates to Redux (optional for now, but good for data flow)
+    // Sync match_update to Redux live status
     useEffect(() => {
-        if (matchStatus) {
-            dispatch(updateLiveStatusFromSocket(matchStatus));
+        if (matchUpdate) {
+            dispatch(updateLiveStatusFromSocket(matchUpdate));
         }
-    }, [matchStatus, dispatch]);
+    }, [matchUpdate, dispatch]);
 
+    // Sync scorecard_delta to Redux scorecard status
     useEffect(() => {
-        if (ballData) {
-            dispatch(updateCommentaryFromSocket(ballData));
+        if (scorecardDelta) {
+            import('../store/matchSlice').then(({ updateScorecardFromSocket }) => {
+                dispatch(updateScorecardFromSocket(scorecardDelta));
+            });
         }
-    }, [ballData, dispatch]);
+    }, [scorecardDelta, dispatch]);
+
+    // Sync latest commentary socket event to Redux to avoid array duplication
+    useEffect(() => {
+        if (latestCommentary) {
+            import('../store/matchSlice').then(({ updateCommentaryFromSocket }) => {
+                dispatch(updateCommentaryFromSocket(latestCommentary));
+            });
+        }
+    }, [latestCommentary, dispatch]);
 
 
+    // On WICKET or OVER_END, do a lightweight REST refresh (scorecard via socket already updates the tab)
+    useEffect(() => {
+        if (!matchUpdate) return;
+        if (matchUpdate.type === 'WICKET' || matchUpdate.type === 'OVER_END') {
+            dispatch(fetchPartnerships({ matchId, inning: currentInning }));
+            dispatch(fetchRecentOvers({ matchId, inning: currentInning }));
+            dispatch(fetchSessions(matchId));
+        }
+    }, [matchUpdate?.type, matchUpdate?.timestamp, matchId, dispatch]);
 
     const currentInning = liveStatus?.currentInning || 1;
     const loadingMatch = loading.details;
     const loadingStatus = loading.liveStatus;
-
-    // 3. Socket-driven Sync: Fetch fresh data on new balls
-    useEffect(() => {
-        if (ballData && ballData._id) { // Use a specific ID if available to ensure stability
-            dispatch(fetchScorecard({ matchId, inning: currentInning }));
-            dispatch(fetchPartnerships({ matchId, inning: currentInning }));
-            dispatch(fetchRecentOvers({ matchId, inning: currentInning }));
-            dispatch(fetchSessions(matchId));
-            dispatch(fetchMatchAnalytics(matchId));
-        }
-    }, [ballData?._id, currentInning, matchId, dispatch]);
 
     const currentScorecard = reduxScorecard[currentInning];
 
@@ -2475,7 +2572,7 @@ export const MatchDetailScreen: React.FC = () => {
                 tabBar={(props) => (
                     <View>
                         <MaterialTopTabBar {...props} />
-                        <ScoreSummaryHeader liveStatus={liveStatus} match={match} />
+                        <ScoreSummaryHeader liveStatus={liveStatus} match={match} isConnected={isConnected} />
                     </View>
                 )}
                 screenOptions={{
@@ -3123,8 +3220,13 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
     },
+    colStatFixed: {
+        width: 38,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     colStat: {
-        width: 35,
+        width: 38,
         textAlign: 'center',
     },
     playerRow: {

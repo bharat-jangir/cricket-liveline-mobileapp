@@ -21,6 +21,7 @@ import { Card } from "../components/ui/Card";
 import { Text as ThemedText } from "../components/ui/Text";
 import { MatchService } from "../services/match.service";
 import { useFetch } from "../hooks/useFetch";
+import { useLiveMatches } from "../hooks/useLiveMatches";
 import LogoSVG from '../../assets/cp-nobg-logo.svg';
 
 
@@ -132,6 +133,9 @@ export const HomeScreen: React.FC = () => {
     []
   );
 
+  // Live socket updates for the listing screen
+  const { liveUpdates, isConnected: socketConnected } = useLiveMatches();
+
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = React.useCallback(async () => {
@@ -141,10 +145,10 @@ export const HomeScreen: React.FC = () => {
   }, [fetchLiveMatches]);
 
   useEffect(() => {
-    // Polling for live list updates every 30s (companion to sockets)
+    // REST polling every 60s — sockets handle sub-second updates
     const pollInterval = setInterval(() => {
       fetchLiveMatches();
-    }, 30000);
+    }, 60000);
     return () => clearInterval(pollInterval);
   }, []);
 
@@ -207,37 +211,62 @@ export const HomeScreen: React.FC = () => {
   );
 
   const renderLiveMatch = ({ item }: { item: any }) => {
-    // Determine team names safely (AppMatchesService now outputs flattened team1 and team2 structures)
-    const team1Name = item.team1?.name || item.team1?.code || item.teamAId?.shortName || 'Team 1';
-    const team2Name = item.team2?.name || item.team2?.code || item.teamBId?.shortName || 'Team 2';
+    const matchId = item._id || item.id;
+    // Merge socket live update on top of REST data
+    const socketData = liveUpdates[matchId];
+
+    const team1Name = socketData?.teamA?.name || item.team1?.name || item.team1?.code || item.teamAId?.shortName || 'Team 1';
+    const team2Name = socketData?.teamB?.name || item.team2?.name || item.team2?.code || item.teamBId?.shortName || 'Team 2';
+    const team1Code = socketData?.teamA?.code || item.team1?.code || team1Name.slice(0, 3).toUpperCase();
+    const team2Code = socketData?.teamB?.code || item.team2?.code || team2Name.slice(0, 3).toUpperCase();
+    const team1Score = socketData?.teamA?.score;
+    const team2Score = socketData?.teamB?.score;
+    const hasLiveScore = !!(team1Score && team2Score);
 
     return (
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={() => navigation.navigate('MatchDetails', { 
-          matchId: item._id || item.id,
-          team1Name: team1Name,
-          team2Name: team2Name
+          matchId,
+          team1Name,
+          team2Name
         })}
       >
         <Card style={styles.liveMatchCard} elevation="md">
           <View style={styles.cardHeader}>
             <ThemedText style={[styles.matchTitleText, { color: theme.textSecondary }]} numberOfLines={1}>
-              {team1Name} vs {team2Name}
+              {team1Code} vs {team2Code}
             </ThemedText>
             <View style={styles.liveIndicator}>
-              <View style={styles.liveDot} />
+              <View style={[styles.liveDot, { backgroundColor: socketConnected ? '#22c55e' : '#ef4444' }]} />
               <ThemedText style={styles.liveText}>LIVE</ThemedText>
             </View>
           </View>
           <View style={styles.matchInfo}>
-            {/* Show Toss or Series temporarily if live score is not built in the list API */}
-            <ThemedText style={[styles.teamScore, { color: theme.text }]} numberOfLines={1}>
-              {item.series || item.title || 'Match'}
-            </ThemedText>
-            <ThemedText style={[{ fontSize: 10, color: theme.textSecondary }]} numberOfLines={1}>
-              {item.result || item.status || 'Match Scheduled'}
-            </ThemedText>
+            {hasLiveScore ? (
+              <>
+                <ThemedText style={[styles.teamScore, { color: theme.text }]} numberOfLines={1}>
+                  {team1Code}: {team1Score} ({socketData?.teamA?.overs})
+                </ThemedText>
+                <ThemedText style={[styles.teamScore, { color: theme.textSecondary }]} numberOfLines={1}>
+                  {team2Code}: {team2Score}
+                </ThemedText>
+                {socketData?.lastBallLabel ? (
+                  <View style={styles.lastBallBadge}>
+                    <ThemedText style={styles.lastBallText}>{socketData.lastBallLabel}</ThemedText>
+                  </View>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <ThemedText style={[styles.teamScore, { color: theme.text }]} numberOfLines={1}>
+                  {item.series || item.title || 'Match'}
+                </ThemedText>
+                <ThemedText style={[{ fontSize: 10, color: theme.textSecondary }]} numberOfLines={1}>
+                  {item.result || item.status || 'Match Scheduled'}
+                </ThemedText>
+              </>
+            )}
           </View>
         </Card>
       </TouchableOpacity>
@@ -655,6 +684,19 @@ const styles = StyleSheet.create({
     fontSize: 8,
     color: "#ef4444",
     fontWeight: "600",
+  },
+  lastBallBadge: {
+    backgroundColor: 'rgba(34,197,94,0.15)',
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    alignSelf: 'flex-start',
+    marginTop: 2,
+  },
+  lastBallText: {
+    fontSize: 8,
+    color: '#22c55e',
+    fontWeight: '700',
   },
   matchTitle: {
     alignItems: "flex-start",

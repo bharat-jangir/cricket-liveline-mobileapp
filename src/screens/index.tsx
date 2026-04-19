@@ -12,6 +12,7 @@ import { useTheme } from '@/theme/ThemeContext';
 import { Text as ThemedText } from '@/components/ui/Text';
 import { Card } from '@/components/ui/Card';
 import { spacing } from '@/theme';
+import { useLiveMatches } from '../hooks/useLiveMatches';
 
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { MatchCard } from '@/components/MatchCard';
@@ -36,6 +37,9 @@ const MatchList = ({ route }: any) => {
     [activeTab]
   );
 
+  // Live socket updates for the listing screen
+  const { liveUpdates } = useLiveMatches();
+
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = React.useCallback(async () => {
@@ -45,29 +49,33 @@ const MatchList = ({ route }: any) => {
   }, [fetchMatches]);
 
   const mapApiToMatch = (item: any) => {
-    const team1Name = item.team1?.name || item.team1?.code || item.teamAId?.shortName || (typeof item.team1 === 'string' ? item.team1 : 'T1');
-    const team2Name = item.team2?.name || item.team2?.code || item.teamBId?.shortName || (typeof item.team2 === 'string' ? item.team2 : 'T2');
+    const matchId = item._id || item.id;
+    // Overlay socket live update for LIVE tab
+    const socketData = activeTab === 'live' ? liveUpdates[matchId] : null;
+
+    const team1Name = socketData?.teamA?.name || item.team1?.name || item.team1?.code || item.teamAId?.shortName || (typeof item.team1 === 'string' ? item.team1 : 'T1');
+    const team2Name = socketData?.teamB?.name || item.team2?.name || item.team2?.code || item.teamBId?.shortName || (typeof item.team2 === 'string' ? item.team2 : 'T2');
 
     return {
-      id: item._id || item.id,
+      id: matchId,
       series: item.seriesId?.name || item.series?.name || item.series || 'Series',
       format: item.matchFormat || item.format || 'T20',
       team1: {
         name: team1Name,
-        code: item.team1?.code || item.teamAId?.shortName || 'T1',
-        score: item.team1?.score || item.liveStatus?.score || item.team1Score,
-        overs: item.team1?.overs || item.liveStatus?.overs || item.team1Overs,
+        code: socketData?.teamA?.code || item.team1?.code || item.teamAId?.shortName || 'T1',
+        score: socketData?.teamA?.score || item.team1?.score || item.liveStatus?.score || item.team1Score,
+        overs: socketData?.teamA?.overs || item.team1?.overs || item.liveStatus?.overs || item.team1Overs,
       },
       team2: {
         name: team2Name,
-        code: item.team2?.code || item.teamBId?.shortName || 'T2',
-        score: item.team2?.score || item.liveStatus?.team2Score || item.team2Score,
-        overs: item.team2?.overs || item.liveStatus?.team2Overs || item.team2Overs,
+        code: socketData?.teamB?.code || item.team2?.code || item.teamBId?.shortName || 'T2',
+        score: socketData?.teamB?.score || item.team2?.score || item.liveStatus?.team2Score || item.team2Score,
+        overs: socketData?.teamB?.overs || item.team2?.overs || item.liveStatus?.team2Overs || item.team2Overs,
       },
       status: item.status === 'live' ? 'Live' : (item.status === 'scheduled' ? 'Scheduled' : 'Completed'),
       venue: item.venueId?.name || item.venue?.name || item.venue || 'Venue',
       time: item.startTime ? new Date(item.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined,
-      runRate: item.liveStatus?.runRate,
+      runRate: socketData?.runRate || item.liveStatus?.runRate,
       result: typeof item.result === 'string' ? item.result : (item.result?.resultText || item.toss?.tossText)
     };
   };
