@@ -15,8 +15,8 @@ const deriveSocketUrl = (): string => {
 
   // 2. Derive from API URL
   // If undefined, use the same default ngrok URL as apiClient.ts
-  const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'https://1cd0-43-249-53-242.ngrok-free.app/api';
-  
+  const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'https://9a3c-43-249-53-242.ngrok-free.app/api';
+
   // Strip /api suffix and return the root
   return apiUrl.replace(/\/api\/?$/, '');
 };

@@ -14,3 +14,9 @@ local.properties
 
 # Bundle artifacts
 *.jsbundle
+
+# Environments
+.env
+.env.local
+.env.*
+!.env.example
