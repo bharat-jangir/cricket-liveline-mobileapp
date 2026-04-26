@@ -8,11 +8,13 @@ export * from './AllPlayersScreen';
 export * from './PlayerProfileScreen';
 export * from './MatchLedgerScreen';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/theme/ThemeContext';
 import { Text as ThemedText } from '@/components/ui/Text';
 import { Card } from '@/components/ui/Card';
-import { spacing } from '@/theme';
+import { spacing, fontSize, scale } from '@/theme';
 import { useLiveMatches } from '../hooks/useLiveMatches';
+import LogoSVG from '../../assets/cp-nobg-logo.svg';
 
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { MatchCard } from '@/components/MatchCard';
@@ -132,12 +134,42 @@ const MatchList = ({ route }: any) => {
 
 export const MatchesScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
+  const navigation = useNavigation<any>();
 
   return (
     <View style={styles.container}>
-      {/* <LinearGradient colors={isDark ? [theme.surface, theme.background] : [theme.primary, theme.primaryDark]} style={styles.header}>
-        <ThemedText variant="title" color="white" weight="bold">Matches</ThemedText>
-      </LinearGradient> */}
+      {/* Header */}
+      <LinearGradient
+        colors={isDark ? [theme.surface, theme.background] : [theme.primary, theme.primaryDark]}
+        style={styles.mainHeader}
+      >
+        <View style={styles.headerContent}>
+          <View style={styles.headerLeft}>
+            <View style={styles.logoContainer}>
+              <LogoSVG width={scale(40)} height={scale(40)} style={styles.logo} />
+            </View>
+            <View>
+              <ThemedText style={styles.appTitle}>Cricket Pulse</ThemedText>
+              <ThemedText style={styles.appSubtitle}>Live Cricket Scores</ThemedText>
+            </View>
+          </View>
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={() => navigation.navigate('GlobalSearch')}
+            >
+              <Ionicons name="search" size={20} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={() => navigation.navigate('ProfileMenu')}
+            >
+              <Ionicons name="menu" size={20} color="white" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </LinearGradient>
+
       <Tab.Navigator
         screenOptions={{
           tabBarStyle: { backgroundColor: theme.surface },
@@ -244,6 +276,52 @@ export const ProfileScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  mainHeader: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg + 10,
+    paddingBottom: spacing.sm,
+  },
+  headerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  logoContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(235, 226, 226, 0.08)",
+  },
+  logo: {
+    width: 32,
+    height: 32,
+  },
+  appTitle: {
+    fontSize: fontSize.xl,
+    fontWeight: "bold",
+    color: "white",
+  },
+  appSubtitle: {
+    fontSize: fontSize.xs,
+    color: "rgba(255, 255, 255, 0.8)",
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  headerButton: {
+    padding: spacing.sm,
+    borderRadius: 20,
+    position: "relative",
+  },
   header: { paddingVertical: spacing.sm, paddingHorizontal: spacing.lg, alignItems: 'center' },
   tabContainer: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#E5E5EA' },
   tab: { flex: 1, paddingVertical: spacing.sm, alignItems: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent' },

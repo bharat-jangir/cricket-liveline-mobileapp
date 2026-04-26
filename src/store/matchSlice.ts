@@ -264,10 +264,20 @@ const matchSlice = createSlice({
       });
     },
     updatePowerplayFromSocket: (state, action: PayloadAction<any>) => {
-      if (!state.liveStatus) return;
-      if (action.payload.onOC !== undefined) state.liveStatus.onOC = action.payload.onOC;
-      if (action.payload.powerPlay !== undefined) state.liveStatus.powerPlay = action.payload.powerPlay;
-      if (action.payload.powerplayOvers !== undefined) state.liveStatus.powerplayOvers = action.payload.powerplayOvers;
+      const p = action.payload;
+      if (state.liveStatus) {
+        if (p.onOC !== undefined) state.liveStatus.onOC = p.onOC;
+        if (p.powerPlay !== undefined) state.liveStatus.powerPlay = p.powerPlay;
+        if (p.powerplayOvers !== undefined) state.liveStatus.powerplayOvers = p.powerplayOvers;
+        if (p.noScorecards !== undefined) state.liveStatus.noScorecards = p.noScorecards;
+        if (p.noCommentry !== undefined) state.liveStatus.noCommentry = p.noCommentry;
+      }
+      
+      // Also update root match details for tab visibility logic
+      if (state.details) {
+        if (p.noScorecards !== undefined) state.details.noScorecards = p.noScorecards;
+        if (p.noCommentry !== undefined) state.details.noCommentry = p.noCommentry;
+      }
     },
     updateCommentaryFromSocket: (state, action: PayloadAction<any>) => {
       state.commentary = [action.payload, ...state.commentary].slice(0, 100);
@@ -313,12 +323,18 @@ const matchSlice = createSlice({
             bowling: existingBowling,
             inning: {
                 ...current.inning,
+                ...(payload.extras || {}),
                 extras: payload.extras?.total !== undefined ? payload.extras.total : current.inning?.extras || 0,
                 totalRuns: payload.totalRuns !== undefined ? payload.totalRuns : current.inning?.totalRuns,
                 totalWickets: payload.wickets !== undefined ? payload.wickets : current.inning?.totalWickets,
                 runRate: payload.runRate || current.inning?.runRate,
             }
         };
+      }
+    },
+    updateSessionsFromSocket: (state, action: PayloadAction<any>) => {
+      if (action.payload.sessions) {
+        state.sessions = action.payload.sessions;
       }
     },
   },
@@ -458,7 +474,8 @@ export const {
     updateOddsFromSocket,
     updatePowerplayFromSocket,
     updateCommentaryFromSocket,
-    updateScorecardFromSocket
+    updateScorecardFromSocket,
+    updateSessionsFromSocket
 } = matchSlice.actions;
 
 export default matchSlice.reducer;

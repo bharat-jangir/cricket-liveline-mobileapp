@@ -16,7 +16,8 @@ import {
   updateOddsFromSocket, 
   updatePowerplayFromSocket,
   updateCommentaryFromSocket,
-  updateScorecardFromSocket
+  updateScorecardFromSocket,
+  updateSessionsFromSocket
 } from '../store/matchSlice';
 
 // ─── Payload types ────────────────────────────────────────────────────────────
@@ -93,6 +94,8 @@ export interface PowerplayUpdate {
   powerplayOvers?: string;
   powerPlay?: boolean;
   onOC?: boolean;
+  noScorecards?: boolean;
+  noCommentry?: boolean;
   timestamp: string;
 }
 
@@ -279,6 +282,11 @@ export function useLiveMatch(matchId: string | null): UseLiveMatchReturn {
       console.log('[useLiveMatch] session_odds_update RECEIVED');
       setOddsUpdate(data);
       dispatch(updateOddsFromSocket(data));
+    });
+
+    socket.on('sessions_table_update', (data: any) => {
+      console.log('[useLiveMatch] sessions_table_update RECEIVED');
+      dispatch(updateSessionsFromSocket(data));
     });
 
     socket.on('powerplay_update', (data: PowerplayUpdate) => {
