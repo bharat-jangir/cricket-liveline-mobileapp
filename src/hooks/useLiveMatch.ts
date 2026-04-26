@@ -9,6 +9,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import { io, Socket } from 'socket.io-client';
+import { AppState } from 'react-native';
+import { Audio } from 'expo-av';
 import { SOCKET_URL } from '../services/socketClient';
 import { 
   updateLiveStatusFromSocket, 
@@ -205,6 +207,60 @@ interface UseLiveMatchReturn {
 export function useLiveMatch(matchId: string | null): UseLiveMatchReturn {
   const socketRef = useRef<Socket | null>(null);
   const dispatch = useDispatch();
+  const ballSoundRef = useRef<Audio.Sound | null>(null);
+
+  // Initialize audio mode
+  useEffect(() => {
+    const setupAudio = async () => {
+      try {
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          allowsRecordingIOS: false,
+          staysActiveInBackground: false,
+          interruptionModeIOS: 1, // InterruptionModeIOS.DoNotMix
+          shouldDuckAndroid: true,
+          interruptionModeAndroid: 1, // InterruptionModeAndroid.DoNotMix
+          playThroughEarpieceAndroid: false
+        });
+        console.log('[useLiveMatch] Audio mode initialized');
+      } catch (e) {
+        console.warn('[useLiveMatch] Audio mode error:', e);
+      }
+    };
+    setupAudio();
+  }, []);
+
+  // Play ball sound helper
+  const playBallSound = useCallback(async () => {
+    try {
+      const state = AppState.currentState;
+      console.log(`[useLiveMatch] Attempting to play sound. AppState: ${state}`);
+      
+      if (state !== 'active') {
+        console.log('[useLiveMatch] Audio suppressed: App is in background');
+        return;
+      }
+      
+      // Create and play
+      console.log('[useLiveMatch] Loading sound object...');
+      const { sound } = await Audio.Sound.createAsync(
+        require('../../assets/ball-event-audios/Ball start ball.wav'),
+        { shouldPlay: true }
+      );
+      
+      console.log('[useLiveMatch] Sound loaded and playing');
+      
+      // Auto-unload after playback finishes to free memory
+      sound.setOnPlaybackStatusUpdate((status: any) => {
+        if (status.didJustFinish) {
+          console.log('[useLiveMatch] Sound finished, unloading...');
+          sound.unloadAsync();
+        }
+      });
+    } catch (error) {
+      console.warn('[useLiveMatch] Error playing sound:', error);
+    }
+  }, []);
 
   const [isConnected, setIsConnected] = useState(false);
   const [matchUpdate, setMatchUpdate] = useState<MatchUpdate | null>(null);
@@ -257,19 +313,25 @@ export function useLiveMatch(matchId: string | null): UseLiveMatchReturn {
       console.log('[useLiveMatch] SUCCESSFULLY Joined match room:', data);
     });
 
-    // Main Score Update (Renamed from match_update)
-    socket.on('scoreUpdate', (data: MatchUpdate) => {
-      console.log('[useLiveMatch] scoreUpdate RECEIVED:', JSON.stringify(data, null, 2));
+    // Unified Match Update Handler
+    const handleMatchUpdate = (data: MatchUpdate, isLegacy = false) => {
+      console.log(`[useLiveMatch] Match Update RECEIVED (${isLegacy ? 'legacy' : 'scoreUpdate'}):`, data.timestamp);
+      
+      // Update local state and Redux
       setMatchUpdate(data);
       dispatch(updateLiveStatusFromSocket(data));
-    });
 
-    // Backward compatibility for match_update (if any)
-    socket.on('match_update', (data: MatchUpdate) => {
-      console.log('[useLiveMatch] match_update RECEIVED (legacy):', JSON.stringify(data, null, 2));
-      setMatchUpdate(data);
-      dispatch(updateLiveStatusFromSocket(data));
-    });
+      // Trigger audio on 'b' or 'B' events
+      const curBall = data.currentBall;
+      console.log(`[useLiveMatch] currentBall: "${curBall}"`);
+      if (curBall === 'b' || curBall === 'B' || curBall === 'ball' || curBall === 'Ball') {
+        console.log('[useLiveMatch] Triggering PLAY for ball event');
+        playBallSound();
+      }
+    };
+
+    socket.on('scoreUpdate', (data: MatchUpdate) => handleMatchUpdate(data));
+    socket.on('match_update', (data: MatchUpdate) => handleMatchUpdate(data, true));
 
     // Specialized Updates
     socket.on('inning_change', (data: InningChange) => {

@@ -1320,7 +1320,7 @@ const ScoreSummaryHeader = ({ liveStatus, match, isConnected }: { liveStatus: an
                 {isScheduled ? (
                     <ThemedText color="white" variant="small" style={{ opacity: 0.8 }}>Countdown to Toss</ThemedText>
                 ) : !isCompleted ? (
-                    <ThemedText color="white" variant="small" style={{ opacity: 0.8 }}>CRR: {crr}</ThemedText>
+                    <ThemedText color="white" variant="small" style={{ opacity: 0.8 }}>CRR: {crr?.toFixed(2)}</ThemedText>
                 ) : (
                     <ThemedText color="white" variant="small" style={{ opacity: 0.8 }}>Match Concluded</ThemedText>
                 )}
@@ -1349,7 +1349,8 @@ const AnimatedBall = ({ ball, isLast, theme, isDark }: { ball: any, isLast: bool
     const runs = Number(ball.runs || 0);
     const label = (ball.ballLabel || '').toString().toLowerCase();
 
-    const isWicket = ball.type === 'wicket' || ball.isWicket || label.includes('w');
+    // Fix: Ensure 'wd' (wide) is not caught by 'label.includes(w)' as a wicket
+    const isWicket = ball.type === 'wicket' || ball.isWicket || (label === 'w' || label === 'wicket');
     const isFour = runs === 4 || label === '4';
     const isSix = runs === 6 || label === '6';
 
@@ -1372,8 +1373,13 @@ const AnimatedBall = ({ ball, isLast, theme, isDark }: { ball: any, isLast: bool
                 transform: [{ translateY: fallAnim }]
             }
         ]}>
-            <ThemedText variant="small" weight="bold" color={isWicket || isFour || isSix ? 'white' : 'text'}>
-                {isWicket ? 'W' : ball.ballLabel || ball.runs}
+            <ThemedText
+                variant="small"
+                weight="bold"
+                color={isWicket || isFour || isSix ? 'white' : 'text'}
+                style={{ fontSize: (ball.ballLabel?.length > 2) ? 8 : 10 }} // Shrink font for longer labels like 'wd+1'
+            >
+                {isWicket ? 'W' : (ball.ballLabel || ball.runs)}
             </ThemedText>
         </Animated.View>
     );
@@ -2682,30 +2688,6 @@ export const MatchDetailScreen: React.FC = () => {
         isConnected,
     } = useLiveMatch(matchId);
 
-    // Sync match_update to Redux live status
-    useEffect(() => {
-        if (matchUpdate) {
-            dispatch(updateLiveStatusFromSocket(matchUpdate));
-        }
-    }, [matchUpdate, dispatch]);
-
-    // Sync scorecard_delta to Redux scorecard status
-    useEffect(() => {
-        if (scorecardDelta) {
-            import('../store/matchSlice').then(({ updateScorecardFromSocket }) => {
-                dispatch(updateScorecardFromSocket(scorecardDelta));
-            });
-        }
-    }, [scorecardDelta, dispatch]);
-
-    // Sync latest commentary socket event to Redux to avoid array duplication
-    useEffect(() => {
-        if (latestCommentary) {
-            import('../store/matchSlice').then(({ updateCommentaryFromSocket }) => {
-                dispatch(updateCommentaryFromSocket(latestCommentary));
-            });
-        }
-    }, [latestCommentary, dispatch]);
 
 
     // On WICKET or OVER_END, do a lightweight REST refresh (scorecard via socket already updates the tab)
@@ -3310,7 +3292,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     bigZeroText: {
-        fontSize: 48,
+        fontSize: 40,
         fontWeight: 'bold',
         color: '#fde047',
     },

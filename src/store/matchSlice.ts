@@ -280,7 +280,12 @@ const matchSlice = createSlice({
       }
     },
     updateCommentaryFromSocket: (state, action: PayloadAction<any>) => {
-      state.commentary = [action.payload, ...state.commentary].slice(0, 100);
+      const newItem = action.payload;
+      // De-duplicate based on timestamp which is reliable for ball events
+      const exists = state.commentary.some(c => c.timestamp === newItem.timestamp);
+      if (!exists) {
+        state.commentary = [newItem, ...state.commentary].slice(0, 100);
+      }
     },
     updateScorecardFromSocket: (state, action: PayloadAction<any>) => {
       const payload = action.payload;
