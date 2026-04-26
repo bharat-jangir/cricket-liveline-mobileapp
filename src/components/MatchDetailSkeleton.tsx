@@ -217,6 +217,60 @@ const InfoBodySkeleton: React.FC = () => {
     );
 };
 
+// ─── Scorecard tab skeleton body ──────────────────────────────────────────────
+export const ScorecardBodySkeleton: React.FC = () => {
+    const { theme, isDark } = useTheme();
+    const borderColor = theme.border;
+
+    const TableHeader: React.FC = () => (
+        <View style={{ flexDirection: 'row', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: borderColor }}>
+           <SkeletonBox width={100} height={14} />
+           <View style={{ flex: 1 }} />
+           <View style={{ flexDirection: 'row', gap: 15, paddingRight: 5 }}>
+               <SkeletonBox width={24} height={14} />
+               <SkeletonBox width={24} height={14} />
+               <SkeletonBox width={24} height={14} />
+               <SkeletonBox width={24} height={14} />
+           </View>
+        </View>
+    );
+
+    const PlayerRow: React.FC = () => (
+        <View style={{ flexDirection: 'row', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: borderColor + '20', alignItems: 'center' }}>
+            <View style={{ flex: 1 }}>
+                <SkeletonBox width={140} height={14} style={{ marginBottom: 6 }} />
+                <SkeletonBox width={80} height={10} style={{ opacity: 0.5 }} />
+            </View>
+            <View style={{ flexDirection: 'row', gap: 15, alignItems: 'center', paddingRight: 5 }}>
+                <SkeletonBox width={24} height={14} />
+                <SkeletonBox width={24} height={14} />
+                <SkeletonBox width={24} height={14} />
+                <SkeletonBox width={24} height={14} />
+            </View>
+        </View>
+    );
+
+    return (
+        <View style={{ padding: spacing.md, gap: spacing.md }}>
+            {/* Batting Card */}
+            <View style={{ backgroundColor: isDark ? theme.surface : '#fff', borderRadius: 12, padding: spacing.md, borderWidth: 1, borderColor }}>
+                <TableHeader />
+                <PlayerRow />
+                <PlayerRow />
+                <PlayerRow />
+                <PlayerRow />
+            </View>
+
+            {/* Bowling Card */}
+            <View style={{ backgroundColor: isDark ? theme.surface : '#fff', borderRadius: 12, padding: spacing.md, borderWidth: 1, borderColor }}>
+                <TableHeader />
+                <PlayerRow />
+                <PlayerRow />
+            </View>
+        </View>
+    );
+};
+
 // ─── Main exported component ──────────────────────────────────────────────────
 export const MatchDetailSkeleton: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const { theme } = useTheme();
@@ -230,6 +284,8 @@ export const MatchDetailSkeleton: React.FC<{ onBack: () => void }> = ({ onBack }
         </View>
     );
 };
+
+export { SkeletonBox };
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({

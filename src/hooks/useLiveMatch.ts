@@ -91,6 +91,7 @@ export interface OddsSessionUpdate {
 export interface PowerplayUpdate {
   matchId: string;
   powerplayOvers?: string;
+  powerPlay?: boolean;
   onOC?: boolean;
   timestamp: string;
 }
@@ -121,6 +122,7 @@ export interface MatchUpdate {
   requiredRunRate?: number;
   requiredRuns?: number;
   remainingBalls?: number;
+  powerPlay?: boolean;
 }
 
 export interface BatterDelta {

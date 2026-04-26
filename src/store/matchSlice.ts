@@ -178,6 +178,7 @@ const matchSlice = createSlice({
       if (payload.runRate !== undefined) state.liveStatus.runRate = payload.runRate;
       if (payload.currentInning !== undefined) state.liveStatus.currentInning = payload.currentInning;
       if (payload.currentBall !== undefined) state.liveStatus.currentBall = payload.currentBall;
+      if (payload.powerPlay !== undefined) state.liveStatus.powerPlay = payload.powerPlay;
       
       // 2. Recent Balls Update (Socket now sends full last 3 overs strip)
       if (payload.recentBalls !== undefined) {
@@ -265,6 +266,7 @@ const matchSlice = createSlice({
     updatePowerplayFromSocket: (state, action: PayloadAction<any>) => {
       if (!state.liveStatus) return;
       if (action.payload.onOC !== undefined) state.liveStatus.onOC = action.payload.onOC;
+      if (action.payload.powerPlay !== undefined) state.liveStatus.powerPlay = action.payload.powerPlay;
       if (action.payload.powerplayOvers !== undefined) state.liveStatus.powerplayOvers = action.payload.powerplayOvers;
     },
     updateCommentaryFromSocket: (state, action: PayloadAction<any>) => {
