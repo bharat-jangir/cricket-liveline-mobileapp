@@ -1,5 +1,6 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
-import { View, StyleSheet, TouchableOpacity, SafeAreaView, Dimensions, ScrollView, FlatList, Image } from 'react-native';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import { View, StyleSheet, TouchableOpacity, SafeAreaView, Dimensions, ScrollView, FlatList, Image, ActivityIndicator, RefreshControl } from 'react-native';
+import { Svg, Circle, G } from 'react-native-svg';
 import BottomSheet, { BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
@@ -9,71 +10,64 @@ import { Text as ThemedText } from '../components/ui/Text';
 import { spacing } from '../theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MatchCard } from '../components/MatchCard';
-import { completedMatches } from '../data/mockData';
+import { VenueService } from '../services/venue.service';
+import { MatchService } from '../services/match.service';
+import { useFetch } from '../hooks/useFetch';
+import { Card } from '@/components/ui/Card';
 
 const TopTab = createMaterialTopTabNavigator();
 const { width } = Dimensions.get('window');
 
-// --- Mock Data ---
-const venueDetails = {
-    established: '1982',
-    capacity: '132,000',
-    knownAs: 'Sardar Patel Stadium, Motera',
-    ends: 'Adani Pavilion End, GMDC End',
-    host: 'Gujarat, Gujarat Titans',
-    timezone: 'UTC +05:30',
-    groundDimensions: {
-        topEndName: "Adani Pavilion End",
-        bottomEndName: "GMDC End",
-        distances: {
-            top: 79,
-            topRight: 57,
-            right: 62,
-            bottomRight: 70,
-            bottom: 82,
-            bottomLeft: 81,
-            left: 74,
-            topLeft: 61,
-        }
-    }
-};
-
-const venueStats = {
-    t20: { matchesPlayed: 25, batFirstWon: 12, bowlFirstWon: 13, avgFirstInnings: 165, highestTotal: '234/4', lowestTotal: '66/10' },
-    odi: { matchesPlayed: 30, batFirstWon: 16, bowlFirstWon: 14, avgFirstInnings: 245, highestTotal: '365/2', lowestTotal: '85/10' },
-    test: { matchesPlayed: 16, batFirstWon: 8, bowlFirstWon: 5, avgFirstInnings: 350, highestTotal: '550/7', lowestTotal: '81/10' },
-};
-
-const venueNews = [
-    { id: '1', title: 'World Cup final to be held at Narendra Modi Stadium', date: '2 days ago', image: 'https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=800&q=80' },
-    { id: '2', title: 'New pitch laid out for the upcoming IPL season', date: '1 week ago', image: 'https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=800&q=80' },
-    { id: '3', title: 'Record crowd expected for IND vs AUS series', date: '2 weeks ago', image: 'https://images.unsplash.com/photo-1577223625816-7546f13df25d?w=800&q=80' },
-];
-
 // --- Tabs ---
 function OverviewTab() {
     const { theme, isDark } = useTheme();
+    const route = useRoute<any>();
+    const { venueId } = route.params || {};
+
+    const { data: venue, loading } = useFetch(
+        () => VenueService.getVenueDetails(venueId),
+        [venueId]
+    );
+
+    if (loading) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}>
+                <ActivityIndicator size="small" color={theme.primary} />
+            </View>
+        );
+    }
+
+    if (!venue) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}>
+                <ThemedText color="textSecondary">Venue details not found</ThemedText>
+            </View>
+        );
+    }
+
+    const infoItems = [
+        { label: 'Established', value: venue.established || 'N/A' },
+        { label: 'Capacity', value: venue.capacity || 'N/A' },
+        { label: 'Known As', value: venue.knownAs || venue.name },
+        { label: 'Ends', value: venue.ends || 'N/A' },
+        { label: 'Host', value: venue.host || 'N/A' },
+        { label: 'Timezone', value: venue.timezone || 'N/A' },
+    ];
+
     return (
         <ScrollView style={{ flex: 1, backgroundColor: theme.background }} contentContainerStyle={{ padding: spacing.md }}>
             <View style={{ backgroundColor: theme.card, padding: spacing.md, borderRadius: 12, borderWidth: 1, borderColor: theme.border }}>
                 <ThemedText variant="title" weight="bold" style={{ marginBottom: spacing.md }}>Venue Information</ThemedText>
 
-                {[
-                    { label: 'Established', value: venueDetails.established },
-                    { label: 'Capacity', value: venueDetails.capacity },
-                    { label: 'Known As', value: venueDetails.knownAs },
-                    { label: 'Ends', value: venueDetails.ends },
-                    { label: 'Host', value: venueDetails.host },
-                    { label: 'Timezone', value: venueDetails.timezone },
-                ].map((item, index) => (
-                    <View key={index} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.sm, borderBottomWidth: index === 5 ? 0 : 1, borderBottomColor: theme.border }}>
+                {infoItems.map((item, index) => (
+                    <View key={index} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.sm, borderBottomWidth: index === infoItems.length - 1 ? 0 : 1, borderBottomColor: theme.border }}>
                         <ThemedText color="textSecondary">{item.label}</ThemedText>
                         <ThemedText weight="bold" style={{ flex: 1, textAlign: 'right', marginLeft: spacing.lg }}>{item.value}</ThemedText>
                     </View>
                 ))}
             </View>
 
-            {venueDetails.groundDimensions && (
+            {venue.groundDimensions && (
                 <View style={{ marginTop: spacing.lg, backgroundColor: theme.card, padding: spacing.md, borderRadius: 12, borderWidth: 1, borderColor: theme.border }}>
                     <ThemedText variant="title" weight="bold" style={{ marginBottom: spacing.md }}>Ground Dimensions</ThemedText>
 
@@ -84,22 +78,22 @@ function OverviewTab() {
 
                             {/* Ends */}
                             <View style={{ position: 'absolute', top: -35, left: 0, right: 0, alignItems: 'center' }}>
-                                <ThemedText style={{ fontSize: 13, fontWeight: 'bold' }} color="textSecondary">{venueDetails.groundDimensions.topEndName}</ThemedText>
+                                <ThemedText style={{ fontSize: 13, fontWeight: 'bold' }} color="textSecondary">{venue.groundDimensions.topEndName || 'North End'}</ThemedText>
                             </View>
                             <View style={{ position: 'absolute', bottom: -35, left: 0, right: 0, alignItems: 'center' }}>
-                                <ThemedText style={{ fontSize: 13, fontWeight: 'bold' }} color="textSecondary">{venueDetails.groundDimensions.bottomEndName}</ThemedText>
+                                <ThemedText style={{ fontSize: 13, fontWeight: 'bold' }} color="textSecondary">{venue.groundDimensions.bottomEndName || 'South End'}</ThemedText>
                             </View>
 
                             {/* Distances */}
                             <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center' }}>
-                                <DistanceLabel distance={venueDetails.groundDimensions.distances.top} angle={270} />
-                                <DistanceLabel distance={venueDetails.groundDimensions.distances.topRight} angle={315} />
-                                <DistanceLabel distance={venueDetails.groundDimensions.distances.right} angle={0} />
-                                <DistanceLabel distance={venueDetails.groundDimensions.distances.bottomRight} angle={45} />
-                                <DistanceLabel distance={venueDetails.groundDimensions.distances.bottom} angle={90} />
-                                <DistanceLabel distance={venueDetails.groundDimensions.distances.bottomLeft} angle={135} />
-                                <DistanceLabel distance={venueDetails.groundDimensions.distances.left} angle={180} />
-                                <DistanceLabel distance={venueDetails.groundDimensions.distances.topLeft} angle={225} />
+                                <DistanceLabel distance={venue.groundDimensions.distances?.top} angle={270} />
+                                <DistanceLabel distance={venue.groundDimensions.distances?.topRight} angle={315} />
+                                <DistanceLabel distance={venue.groundDimensions.distances?.right} angle={0} />
+                                <DistanceLabel distance={venue.groundDimensions.distances?.bottomRight} angle={45} />
+                                <DistanceLabel distance={venue.groundDimensions.distances?.bottom} angle={90} />
+                                <DistanceLabel distance={venue.groundDimensions.distances?.bottomLeft} angle={135} />
+                                <DistanceLabel distance={venue.groundDimensions.distances?.left} angle={180} />
+                                <DistanceLabel distance={venue.groundDimensions.distances?.topLeft} angle={225} />
                             </View>
                         </View>
                     </View>
@@ -109,7 +103,8 @@ function OverviewTab() {
     );
 }
 
-const DistanceLabel = ({ distance, angle }: { distance: number, angle: number }) => {
+const DistanceLabel = ({ distance, angle }: { distance?: number, angle: number }) => {
+    if (distance === undefined || distance === null) return null;
     const radius = 105;
     const rad = angle * (Math.PI / 180);
     const x = radius * Math.cos(rad);
@@ -136,11 +131,29 @@ const DistanceLabel = ({ distance, angle }: { distance: number, angle: number })
     );
 }
 
+interface Match {
+    _id: string;
+    id: string;
+    gender?: string;
+    matchFormat?: string;
+    matchType?: string;
+    seriesId?: { name: string };
+    series?: string;
+    [key: string]: any;
+}
+
 function MatchesTab() {
     const { theme, isDark } = useTheme();
+    const route = useRoute<any>();
+    const { venueId } = route.params || {};
     const [gender, setGender] = useState<'Men' | 'Women'>('Men');
     const [matchType, setMatchType] = useState('All');
     const [expandedSeries, setExpandedSeries] = useState<Record<string, boolean>>({});
+
+    const { data: matches, loading } = useFetch<Match[]>(async () => {
+        const res = await MatchService.getMatches({ venueId, limit: 50 } as any);
+        return res;
+    }, [venueId]);
 
     const matchTypes = ['All', 'T20I', 'ODI', 'Test', 'IPL'];
 
@@ -148,12 +161,51 @@ function MatchesTab() {
         setExpandedSeries(prev => ({ ...prev, [seriesName]: !prev[seriesName] }));
     };
 
-    // Grouping completedMatches as a quick mock to show the accordion
-    const groupedMatches = completedMatches.reduce((acc, match) => {
-        if (!acc[match.series]) acc[match.series] = [];
-        acc[match.series].push(match);
-        return acc;
-    }, {} as Record<string, typeof completedMatches>);
+    const filteredMatches = useMemo(() => {
+        if (!matches || !Array.isArray(matches)) return [];
+
+        return matches.filter(match => {
+            // Gender filter
+            if (gender === 'Men' && match.gender === 'female') return false;
+            if (gender === 'Women' && match.gender !== 'female') return false;
+
+            // Match Type filter
+            if (matchType === 'All') return true;
+
+            const format = (match.matchFormat || '').toLowerCase();
+            const type = (match.matchType || '').toLowerCase();
+
+            if (matchType === 'T20I') return format === 't20i' || format === 't20';
+            if (matchType === 'ODI') return format === 'odi';
+            if (matchType === 'Test') return format === 'test';
+            if (matchType === 'IPL') return type === 'league';
+
+            return true;
+        });
+    }, [matches, matchType, gender]);
+
+    const groupedMatches = useMemo(() => {
+        const groups = filteredMatches.reduce((acc, match) => {
+            const seriesName = match.seriesId?.name || match.series || 'Other Series';
+            if (!acc[seriesName]) acc[seriesName] = [];
+
+            // Only add if we have less than 5 matches for this series
+            if (acc[seriesName].length < 5) {
+                acc[seriesName].push(match);
+            }
+            return acc;
+        }, {} as Record<string, any[]>);
+
+        return groups;
+    }, [filteredMatches]);
+
+    if (loading && !matches) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}>
+                <ActivityIndicator size="small" color={theme.primary} />
+            </View>
+        );
+    }
 
     return (
         <View style={{ flex: 1, backgroundColor: theme.background }}>
@@ -197,7 +249,7 @@ function MatchesTab() {
 
             <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.md, paddingBottom: spacing.xl }}>
                 {Object.keys(groupedMatches).length === 0 && (
-                    <ThemedText color="textSecondary" style={{ textAlign: 'center', marginTop: spacing.xl }}>No matches available</ThemedText>
+                    <ThemedText color="textSecondary" style={{ textAlign: 'center', marginTop: spacing.xl }}>No matches available for this venue</ThemedText>
                 )}
                 {Object.entries(groupedMatches).map(([series, matches]) => {
                     const isExpanded = expandedSeries[series] !== false; // Default to expanded
@@ -218,17 +270,11 @@ function MatchesTab() {
                             {isExpanded && (
                                 <View style={{ paddingBottom: spacing.md }}>
                                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.sm, gap: spacing.md }}>
-                                        {matches.map(match => (
-                                            <View key={match.id} style={{ width: 320 }}>
+                                        {matches.map((match: any) => (
+                                            <View key={match._id || match.id} style={{ width: 320 }}>
                                                 <MatchCard match={match} />
                                             </View>
                                         ))}
-                                        {/* Since mock data has few matches per series, we duplicate one to show horizontal scrolling layout better */}
-                                        {matches.length === 1 && (
-                                            <View style={{ width: 320 }}>
-                                                <MatchCard match={{ ...matches[0], id: matches[0].id + '_mock' }} />
-                                            </View>
-                                        )}
                                     </ScrollView>
                                 </View>
                             )}
@@ -240,35 +286,161 @@ function MatchesTab() {
     );
 }
 
+const DonutChart = ({ batFirst, bowlFirst }: any) => {
+    const total = (batFirst || 0) + (bowlFirst || 0);
+    const batFirstPer = total > 0 ? (batFirst / total) * 100 : 50;
+    const bowlFirstPer = total > 0 ? (bowlFirst / total) * 100 : 50;
+    
+    const size = 160;
+    const strokeWidth = 18;
+    const center = size / 2;
+    const radius = (size - strokeWidth) / 2;
+    const circumference = 2 * Math.PI * radius;
+    
+    const batFirstOffset = circumference - (circumference * batFirstPer) / 100;
+
+    return (
+        <View style={{ alignItems: 'center', marginVertical: spacing.lg }}>
+            <View style={{ width: size, height: size }}>
+                <Svg width={size} height={size}>
+                    <G rotation="-90" origin={`${center}, ${center}`}>
+                        <Circle
+                            cx={center}
+                            cy={center}
+                            r={radius}
+                            stroke="#3b82f6"
+                            strokeWidth={strokeWidth}
+                            fill="transparent"
+                            strokeDasharray={circumference}
+                            strokeDashoffset={0}
+                            opacity={0.8}
+                        />
+                        <Circle
+                            cx={center}
+                            cy={center}
+                            r={radius}
+                            stroke="#22c55e"
+                            strokeWidth={strokeWidth}
+                            fill="transparent"
+                            strokeDasharray={circumference}
+                            strokeDashoffset={batFirstOffset}
+                            strokeLinecap="round"
+                        />
+                    </G>
+                </Svg>
+                <View style={{ position: 'absolute', width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
+                    <ThemedText variant="title" weight="bold" style={{ fontSize: 24 }}>{total}</ThemedText>
+                    <ThemedText variant="caption" color="textSecondary" style={{ textTransform: 'uppercase', letterSpacing: 1 }}>Matches</ThemedText>
+                </View>
+            </View>
+            
+            <View style={{ flexDirection: 'row', gap: 24, marginTop: spacing.xl }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#22c55e' }} />
+                    <View>
+                        <ThemedText variant="small" weight="bold">Bat First</ThemedText>
+                        <ThemedText variant="caption" color="textSecondary">{Math.round(batFirstPer)}% Win Rate</ThemedText>
+                    </View>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#3b82f6' }} />
+                    <View>
+                        <ThemedText variant="small" weight="bold">Bowl First</ThemedText>
+                        <ThemedText variant="caption" color="textSecondary">{Math.round(bowlFirstPer)}% Win Rate</ThemedText>
+                    </View>
+                </View>
+            </View>
+        </View>
+    );
+};
+
+const RecordCard = ({ label, value, icon, color, theme }: any) => (
+    <Card style={{ 
+        width: '48%', 
+        padding: spacing.md, 
+        marginBottom: spacing.sm,
+        borderWidth: 1,
+        borderColor: theme.borderLight,
+        shadowOpacity: 0.05,
+        shadowRadius: 5
+    }}>
+        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: color + '15', justifyContent: 'center', alignItems: 'center', marginBottom: spacing.sm }}>
+            <Ionicons name={icon as any} size={20} color={color} />
+        </View>
+        <ThemedText variant="caption" color="textLight" weight="bold" style={{ textTransform: 'uppercase', fontSize: 9, letterSpacing: 0.5 }}>{label}</ThemedText>
+        <ThemedText weight="bold" style={{ fontSize: 18, marginTop: 4 }}>{value || 'N/A'}</ThemedText>
+    </Card>
+);
+
 function StatsTab() {
     const { theme, isDark } = useTheme();
-    const [gender, setGender] = useState<'Men' | 'Women'>('Men');
+    const route = useRoute<any>();
+    const { venueId } = route.params || {};
     const [matchType, setMatchType] = useState('T20I');
-    const stats = venueStats['t20']; // Using t20 mock data for now
-
     const matchTypes = ['T20I', 'ODI', 'Test', 'IPL'];
+
+    const { data: statsData, loading } = useFetch<any>(
+        () => VenueService.getVenueStats(venueId),
+        [venueId]
+    );
+
+    const currentStats = useMemo(() => {
+        if (!statsData) return null;
+        let key = 't20';
+        switch (matchType) {
+            case 'T20I': key = 't20'; break;
+            case 'ODI': key = 'odi'; break;
+            case 'Test': key = 'firstClass'; break;
+            case 'IPL': key = 'ipl'; break;
+            default: key = 't20';
+        }
+        return statsData[key] || null;
+    }, [statsData, matchType]);
+
+    if (loading) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}>
+                <ActivityIndicator size="small" color={theme.primary} />
+            </View>
+        );
+    }
+
+    if (!currentStats || (currentStats && currentStats.matches === 0)) {
+        return (
+            <View style={{ flex: 1, backgroundColor: theme.background }}>
+                <View style={{ padding: spacing.md, paddingBottom: 0 }}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm, paddingBottom: spacing.md }}>
+                        {matchTypes.map(type => (
+                            <TouchableOpacity
+                                key={type}
+                                style={{
+                                    paddingHorizontal: spacing.xl,
+                                    paddingVertical: spacing.sm,
+                                    borderRadius: 20,
+                                    backgroundColor: matchType === type ? theme.primary : theme.card,
+                                    borderWidth: 1,
+                                    borderColor: matchType === type ? theme.primary : theme.border
+                                }}
+                                onPress={() => setMatchType(type)}
+                            >
+                                <ThemedText weight="bold" color={matchType === type ? 'white' : 'textSecondary'}>{type}</ThemedText>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl }}>
+                    <Ionicons name="stats-chart-outline" size={48} color={theme.textSecondary} style={{ opacity: 0.5, marginBottom: spacing.md }} />
+                    <ThemedText color="textSecondary" style={{ textAlign: 'center' }}>No statistics available for {matchType} matches at this venue.</ThemedText>
+                </View>
+            </View>
+        );
+    }
 
     return (
         <ScrollView style={{ flex: 1, backgroundColor: theme.background }} contentContainerStyle={{ paddingBottom: spacing.xl }}>
-            <View style={{ padding: spacing.md, paddingBottom: 0 }}>
-                {/* Gender Toggle */}
-                <View style={{ flexDirection: 'row', backgroundColor: theme.card, borderRadius: 8, padding: 4, marginBottom: spacing.md, borderWidth: 1, borderColor: theme.border }}>
-                    <TouchableOpacity
-                        style={{ flex: 1, paddingVertical: 8, alignItems: 'center', backgroundColor: gender === 'Men' ? theme.primary : 'transparent', borderRadius: 6 }}
-                        onPress={() => setGender('Men')}
-                    >
-                        <ThemedText weight="bold" color={gender === 'Men' ? 'white' : 'textSecondary'}>Men</ThemedText>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={{ flex: 1, paddingVertical: 8, alignItems: 'center', backgroundColor: gender === 'Women' ? theme.primary : 'transparent', borderRadius: 6 }}
-                        onPress={() => setGender('Women')}
-                    >
-                        <ThemedText weight="bold" color={gender === 'Women' ? 'white' : 'textSecondary'}>Women</ThemedText>
-                    </TouchableOpacity>
-                </View>
-
+            <View style={{ padding: spacing.md }}>
                 {/* Type Filters */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm, paddingBottom: spacing.md }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm, marginBottom: spacing.md }}>
                     {matchTypes.map(type => (
                         <TouchableOpacity
                             key={type}
@@ -286,267 +458,188 @@ function StatsTab() {
                         </TouchableOpacity>
                     ))}
                 </ScrollView>
-            </View>
 
-            <View style={{ paddingHorizontal: spacing.md, gap: spacing.lg }}>
-
-                {/* Win Percentage (Last 5 Matches) */}
-                <View style={{ backgroundColor: theme.card, padding: spacing.md, borderRadius: 12, borderWidth: 1, borderColor: theme.border }}>
-                    <ThemedText variant="title" weight="bold" style={{ marginBottom: spacing.md }}>Last 5 Matches Performance</ThemedText>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xl }}>
-                        <View style={{ width: 120, height: 120, borderRadius: 60, borderWidth: 12, borderColor: '#ef4444', borderTopColor: '#22c55e', borderRightColor: '#22c55e', justifyContent: 'center', alignItems: 'center' }}>
-                            <ThemedText weight="bold" variant="title">80%</ThemedText>
-                            <ThemedText variant="caption" color="textSecondary">Win Bat First</ThemedText>
-                        </View>
-                        <View style={{ gap: spacing.sm }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                                <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#22c55e' }} />
-                                <ThemedText>Win Bat First (80%)</ThemedText>
-                            </View>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                                <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#ef4444' }} />
-                                <ThemedText>Win Bowl First (20%)</ThemedText>
-                            </View>
-                        </View>
+                {/* Donut Chart Card */}
+                <Card style={{ padding: spacing.lg, marginBottom: spacing.md, alignItems: 'center' }}>
+                    <View style={{ alignSelf: 'flex-start' }}>
+                        <ThemedText variant="subtitle" weight="bold">Win Distribution</ThemedText>
+                        <ThemedText variant="caption" color="textSecondary">Matches based on toss decision</ThemedText>
                     </View>
+                    <DonutChart 
+                        batFirst={currentStats.winBatFirst || 0} 
+                        bowlFirst={currentStats.winBowlFirst || 0} 
+                    />
+                </Card>
 
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.lg, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: theme.border }}>
-                        <View style={{ alignItems: 'center' }}>
-                            <ThemedText color="textSecondary" variant="caption">Avg 1st Innings</ThemedText>
-                            <ThemedText weight="bold" style={{ fontSize: 16 }}>{stats.avgFirstInnings}</ThemedText>
-                        </View>
-                        <View style={{ alignItems: 'center' }}>
-                            <ThemedText color="textSecondary" variant="caption">Avg 2nd Innings</ThemedText>
-                            <ThemedText weight="bold" style={{ fontSize: 16 }}>148</ThemedText>
-                        </View>
-                    </View>
-                </View>
-
-                {/* Score Records */}
-                <View style={{ backgroundColor: theme.card, padding: spacing.md, borderRadius: 12, borderWidth: 1, borderColor: theme.border, gap: spacing.md }}>
-                    <ThemedText variant="title" weight="bold">Venue Records</ThemedText>
-
-                    <View>
-                        <ThemedText color="textSecondary" variant="caption">Highest Total</ThemedText>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <ThemedText weight="bold" style={{ fontSize: 16, color: '#22c55e' }}>207-4 <ThemedText variant="caption" color="textSecondary">(20.0 ov) by SCO</ThemedText></ThemedText>
-                            <ThemedText variant="caption">SCO vs ITA</ThemedText>
-                        </View>
-                    </View>
-
-                    <View>
-                        <ThemedText color="textSecondary" variant="caption">Lowest Total</ThemedText>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <ThemedText weight="bold" style={{ fontSize: 16, color: '#ef4444' }}>66-10 <ThemedText variant="caption" color="textSecondary">(14.2 ov) by ITA</ThemedText></ThemedText>
-                            <ThemedText variant="caption">SCO vs ITA</ThemedText>
-                        </View>
-                    </View>
-
-                    <View style={{ height: 1, backgroundColor: theme.border, marginVertical: spacing.xs }} />
-
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <ThemedText>Highest Chased</ThemedText>
-                        <ThemedText weight="bold">186-4</ThemedText>
-                    </View>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <ThemedText>Lowest Defended</ThemedText>
-                        <ThemedText weight="bold">142-8</ThemedText>
-                    </View>
-                </View>
-
-                {/* Average Pitch Behavior */}
-                <View style={{ backgroundColor: theme.card, padding: spacing.md, borderRadius: 12, borderWidth: 1, borderColor: theme.border }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
-                        <ThemedText variant="subtitle" weight="bold">Avg Pitch Behavior</ThemedText>
-                        <ThemedText variant="caption" color="textSecondary">Last 10 matches</ThemedText>
-                    </View>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm }}>
-                        <ThemedText>Batting Friendly</ThemedText>
-                        <ThemedText weight="bold" color="primary">65%</ThemedText>
-                    </View>
-                    <View style={{ height: 8, backgroundColor: theme.border, borderRadius: 4, overflow: 'hidden' }}>
-                        <View style={{ width: '65%', height: '100%', backgroundColor: theme.primary }} />
-                    </View>
-                </View>
-
-                {/* Avg Scores By Over */}
-                <View style={{ backgroundColor: theme.card, padding: spacing.md, borderRadius: 12, borderWidth: 1, borderColor: theme.border }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
-                        <ThemedText variant="subtitle" weight="bold">Avg Scores on Venue</ThemedText>
-                        <ThemedText variant="caption" color="textSecondary">Last 10 matches</ThemedText>
-                    </View>
-
-                    {/* Table Header */}
-                    <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: theme.border, paddingBottom: spacing.sm, marginBottom: spacing.sm }}>
-                        <ThemedText weight="bold" style={{ flex: 1 }}>Overs</ThemedText>
-                        <ThemedText weight="bold" style={{ flex: 1, textAlign: 'center' }}>1st Inn</ThemedText>
-                        <ThemedText weight="bold" style={{ flex: 1, textAlign: 'center' }}>2nd Inn</ThemedText>
-                    </View>
-
-                    {/* Table Rows */}
+                {/* Innings Averages */}
+                <Card style={{ padding: spacing.lg, marginBottom: spacing.md }}>
+                    <ThemedText variant="subtitle" weight="bold" style={{ marginBottom: spacing.md }}>Innings Averages</ThemedText>
                     {[
-                        { over: '6', inn1: '48', inn2: '45' },
-                        { over: '10', inn1: '76', inn2: '71' },
-                        { over: '15', inn1: '118', inn2: '110' },
-                        { over: '20', inn1: '165', inn2: '148' }
-                    ].map((row, index) => (
-                        <View key={index} style={{ flexDirection: 'row', paddingVertical: spacing.sm, borderBottomWidth: index === 3 ? 0 : 1, borderBottomColor: theme.border }}>
-                            <ThemedText style={{ flex: 1 }}>{row.over}</ThemedText>
-                            <ThemedText style={{ flex: 1, textAlign: 'center' }}>{row.inn1}</ThemedText>
-                            <ThemedText style={{ flex: 1, textAlign: 'center' }}>{row.inn2}</ThemedText>
+                        { label: '1st Innings', score: currentStats.avg1stInn, color: '#10b981' },
+                        { label: '2nd Innings', score: currentStats.avg2ndInn, color: '#3b82f6' },
+                        ...(matchType === 'Test' ? [
+                            { label: '3rd Innings', score: currentStats.avg3rdInn, color: '#f59e0b' },
+                            { label: '4th Innings', score: currentStats.avg4thInn, color: '#ef4444' }
+                        ] : [])
+                    ].map((item, index) => (
+                        <View key={index} style={{ marginBottom: spacing.md }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                                <ThemedText variant="small" weight="medium" color="textSecondary">{item.label}</ThemedText>
+                                <ThemedText weight="bold">{item.score || '0'}</ThemedText>
+                            </View>
+                            <View style={{ height: 8, backgroundColor: theme.border, borderRadius: 4, overflow: 'hidden' }}>
+                                <View style={{ width: `${Math.min((item.score || 0) / 4.5, 100)}%`, height: '100%', backgroundColor: item.color }} />
+                            </View>
                         </View>
                     ))}
-                </View>
+                </Card>
 
-                {/* Pace vs Spin */}
-                <View style={{ backgroundColor: theme.card, padding: spacing.md, borderRadius: 12, borderWidth: 1, borderColor: theme.border }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
-                        <ThemedText variant="title" weight="bold">Pace vs Spin</ThemedText>
-                        <ThemedText variant="caption" color="textSecondary">Wickets</ThemedText>
-                    </View>
-
-                    <View style={{ flexDirection: 'row', height: 24, borderRadius: 12, overflow: 'hidden', marginBottom: spacing.sm }}>
-                        <View style={{ flex: 6, backgroundColor: '#ef4444', justifyContent: 'center', paddingLeft: spacing.sm }}>
-                            <ThemedText color="white" weight="bold" style={{ fontSize: 12 }}>60%</ThemedText>
-                        </View>
-                        <View style={{ flex: 4, backgroundColor: '#22c55e', justifyContent: 'center', alignItems: 'flex-end', paddingRight: spacing.sm }}>
-                            <ThemedText color="white" weight="bold" style={{ fontSize: 12 }}>40%</ThemedText>
-                        </View>
-                    </View>
-
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-                            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#ef4444' }} />
-                            <ThemedText variant="caption">Pace (54 Wkts)</ThemedText>
-                        </View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-                            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#22c55e' }} />
-                            <ThemedText variant="caption">Spin (36 Wkts)</ThemedText>
-                        </View>
+                {/* Records Grid */}
+                <View style={{ paddingHorizontal: 4 }}>
+                    <ThemedText variant="subtitle" weight="bold" style={{ marginBottom: spacing.md }}>Venue Records</ThemedText>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                        <RecordCard label="Highest Total" value={currentStats.highestTotal} icon="trending-up" color="#10b981" theme={theme} />
+                        <RecordCard label="Lowest Total" value={currentStats.lowestTotal} icon="trending-down" color="#ef4444" theme={theme} />
+                        <RecordCard label="Highest Chased" value={currentStats.highestChased} icon="rocket" color="#3b82f6" theme={theme} />
+                        <RecordCard label="Lowest Defended" value={currentStats.lowestDefended} icon="shield" color="#f59e0b" theme={theme} />
                     </View>
                 </View>
-
             </View>
         </ScrollView>
     );
 }
 
-function NewsTab() {
-    const { theme, isDark } = useTheme();
-    const navigation = useNavigation<any>();
+    function NewsTab() {
+        const { theme, isDark } = useTheme();
+        const navigation = useNavigation<any>();
 
-    return (
-        <ScrollView style={{ flex: 1, backgroundColor: theme.background }} contentContainerStyle={{ padding: spacing.md }}>
-            {venueNews.map(item => (
-                <TouchableOpacity
-                    key={item.id}
-                    style={{ backgroundColor: theme.card, borderRadius: 12, marginBottom: spacing.md, overflow: 'hidden', borderWidth: 1, borderColor: theme.border }}
-                    onPress={() => navigation.navigate('NewsDetail')}
-                    activeOpacity={0.8}
-                >
-                    <View style={{ height: 180, backgroundColor: theme.border }}>
-                        <Image source={{ uri: item.image }} style={{ width: '100%', height: '100%' }} />
-                        <LinearGradient
-                            colors={['transparent', 'rgba(0,0,0,0.8)']}
-                            style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 100 }}
-                        />
-                        <View style={{ position: 'absolute', bottom: spacing.md, left: spacing.md, right: spacing.md }}>
-                            <ThemedText weight="bold" color="white" numberOfLines={2} style={{ fontSize: 16, marginBottom: spacing.xs, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
-                                {item.title}
-                            </ThemedText>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-                                <Ionicons name="time-outline" size={14} color="rgba(255,255,255,0.8)" />
-                                <ThemedText variant="caption" style={{ color: 'rgba(255,255,255,0.8)' }}>{item.date}</ThemedText>
+        // In a real app, news would also be fetched
+        const venueNews = [
+            { id: '1', title: 'Major matches announced for this venue', date: '2 days ago', image: 'https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=800&q=80' },
+            { id: '2', title: 'New pitch preparation underway', date: '1 week ago', image: 'https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=800&q=80' },
+        ];
+
+        return (
+            <ScrollView style={{ flex: 1, backgroundColor: theme.background }} contentContainerStyle={{ padding: spacing.md }}>
+                {venueNews.map(item => (
+                    <TouchableOpacity
+                        key={item.id}
+                        style={{ backgroundColor: theme.card, borderRadius: 12, marginBottom: spacing.md, overflow: 'hidden', borderWidth: 1, borderColor: theme.border }}
+                        onPress={() => navigation.navigate('NewsDetail')}
+                        activeOpacity={0.8}
+                    >
+                        <View style={{ height: 180, backgroundColor: theme.border }}>
+                            <Image source={{ uri: item.image }} style={{ width: '100%', height: '100%' }} />
+                            <LinearGradient
+                                colors={['transparent', 'rgba(0,0,0,0.8)']}
+                                style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 100 }}
+                            />
+                            <View style={{ position: 'absolute', bottom: spacing.md, left: spacing.md, right: spacing.md }}>
+                                <ThemedText weight="bold" color="white" numberOfLines={2} style={{ fontSize: 16, marginBottom: spacing.xs, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
+                                    {item.title}
+                                </ThemedText>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                                    <Ionicons name="time-outline" size={14} color="rgba(255,255,255,0.8)" />
+                                    <ThemedText variant="caption" style={{ color: 'rgba(255,255,255,0.8)' }}>{item.date}</ThemedText>
+                                </View>
                             </View>
                         </View>
-                    </View>
-                </TouchableOpacity>
-            ))}
-        </ScrollView>
-    );
-}
-
-function AboutTab() {
-    const { theme, isDark } = useTheme();
-    const bottomSheetRef = useRef<BottomSheet>(null);
-    const snapPoints = useMemo(() => ['50%', '80%'], []);
-
-    const handleOpenBottomSheet = useCallback(() => {
-        bottomSheetRef.current?.expand();
-    }, []);
-
-    const renderBackdrop = useCallback(
-        (props: any) => (
-            <BottomSheetBackdrop
-                {...props}
-                disappearsOnIndex={-1}
-                appearsOnIndex={0}
-                pressBehavior="close"
-            />
-        ),
-        []
-    );
-
-    const fullDescription = `The Narendra Modi Stadium, situated inside the Sardar Vallabhbhai Patel Sports Enclave in Ahmedabad, Gujarat, is the largest cricket stadium in the world and the largest stadium overall, with a seating capacity of 132,000 spectators.\n\nConstructed in 1982 to promote cricket in the province, it initially accommodated 49,000 fans. The stadium underwent a major reconstruction between 2015 and 2020.\n\nIt has hosted numerous memorable matches, including matches during the 1987, 1996, and 2011 Cricket World Cups. The stadium features state-of-the-art facilities, modern dressing rooms, and world-class floodlights ensuring un-interrupted day/night matches.`;
-
-    return (
-        <View style={{ flex: 1, backgroundColor: theme.background }}>
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.md }}>
-
-                {/* Info Card */}
-                <View style={{ backgroundColor: theme.card, padding: spacing.md, borderRadius: 12, borderWidth: 1, borderColor: theme.border, marginBottom: spacing.md }}>
-                    <ThemedText weight="bold" variant="title" style={{ marginBottom: spacing.xs }}>Narendra Modi Stadium</ThemedText>
-
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs, marginTop: spacing.xs }}>
-                        <Ionicons name="location-outline" size={16} color={theme.textSecondary} style={{ marginRight: spacing.xs }} />
-                        <ThemedText variant="caption" color="textSecondary">Ahmedabad, Gujarat</ThemedText>
-                    </View>
-
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
-                        <Ionicons name="calendar-outline" size={16} color={theme.textSecondary} style={{ marginRight: spacing.xs }} />
-                        <ThemedText variant="caption" color="textSecondary">Established: {venueDetails.established}</ThemedText>
-                    </View>
-
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                        <Ionicons name="golf-outline" size={16} color={theme.textSecondary} style={{ marginRight: spacing.xs, marginTop: 2 }} />
-                        <ThemedText variant="caption" color="textSecondary" style={{ flex: 1 }}>Ends: {venueDetails.ends}</ThemedText>
-                    </View>
-                </View>
-
-                {/* Description Card */}
-                <View style={{ backgroundColor: theme.card, padding: spacing.md, borderRadius: 12, borderWidth: 1, borderColor: theme.border }}>
-                    <ThemedText weight="bold" variant="subtitle" style={{ marginBottom: spacing.sm }}>About Venue</ThemedText>
-                    <ThemedText color="textSecondary" numberOfLines={4} style={{ lineHeight: 22 }}>
-                        {fullDescription}
-                    </ThemedText>
-                    <TouchableOpacity onPress={handleOpenBottomSheet} style={{ marginTop: spacing.sm }}>
-                        <ThemedText color="primary" weight="semibold">Read more</ThemedText>
                     </TouchableOpacity>
-                </View>
-
+                ))}
             </ScrollView>
+        );
+    }
 
-            <BottomSheet
-                ref={bottomSheetRef}
-                index={-1}
-                snapPoints={snapPoints}
-                enablePanDownToClose={true}
-                backdropComponent={renderBackdrop}
-                backgroundStyle={{ backgroundColor: theme.card }}
-                handleIndicatorStyle={{ backgroundColor: theme.border }}
-            >
-                <BottomSheetScrollView contentContainerStyle={{ padding: spacing.xl }}>
-                    <ThemedText variant="title" weight="bold" style={{ marginBottom: spacing.md }}>
-                        About Narendra Modi Stadium
-                    </ThemedText>
-                    <ThemedText style={{ lineHeight: 24, color: theme.textSecondary }}>
-                        {fullDescription}
-                    </ThemedText>
-                </BottomSheetScrollView>
-            </BottomSheet>
-        </View>
-    );
-}
+    function AboutTab() {
+        const { theme, isDark } = useTheme();
+        const route = useRoute<any>();
+        const { venueId } = route.params || {};
+        const bottomSheetRef = useRef<BottomSheet>(null);
+        const snapPoints = useMemo(() => ['50%', '80%'], []);
+
+        const { data: venue } = useFetch(
+            () => VenueService.getVenueDetails(venueId),
+            [venueId]
+        );
+
+        const handleOpenBottomSheet = useCallback(() => {
+            bottomSheetRef.current?.expand();
+        }, []);
+
+        const renderBackdrop = useCallback(
+            (props: any) => (
+                <BottomSheetBackdrop
+                    {...props}
+                    disappearsOnIndex={-1}
+                    appearsOnIndex={0}
+                    pressBehavior="close"
+                />
+            ),
+            []
+        );
+
+        if (!venue) return null;
+
+        const fullDescription = venue.description || `The ${venue.name}, situated in ${venue.city}, ${venue.country}, is a premier cricket venue with a seating capacity of ${venue.capacity || 'N/A'} spectators.`;
+
+        return (
+            <View style={{ flex: 1, backgroundColor: theme.background }}>
+                <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.md }}>
+
+                    {/* Info Card */}
+                    <View style={{ backgroundColor: theme.card, padding: spacing.md, borderRadius: 12, borderWidth: 1, borderColor: theme.border, marginBottom: spacing.md }}>
+                        <ThemedText weight="bold" variant="title" style={{ marginBottom: spacing.xs }}>{venue.name}</ThemedText>
+
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs, marginTop: spacing.xs }}>
+                            <Ionicons name="location-outline" size={16} color={theme.textSecondary} style={{ marginRight: spacing.xs }} />
+                            <ThemedText variant="caption" color="textSecondary">{venue.city}, {venue.country}</ThemedText>
+                        </View>
+
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
+                            <Ionicons name="calendar-outline" size={16} color={theme.textSecondary} style={{ marginRight: spacing.xs }} />
+                            <ThemedText variant="caption" color="textSecondary">Established: {venue.established || 'N/A'}</ThemedText>
+                        </View>
+
+                        <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                            <Ionicons name="golf-outline" size={16} color={theme.textSecondary} style={{ marginRight: spacing.xs, marginTop: 2 }} />
+                            <ThemedText variant="caption" color="textSecondary" style={{ flex: 1 }}>Ends: {venue.ends || 'N/A'}</ThemedText>
+                        </View>
+                    </View>
+
+                    {/* Description Card */}
+                    <View style={{ backgroundColor: theme.card, padding: spacing.md, borderRadius: 12, borderWidth: 1, borderColor: theme.border }}>
+                        <ThemedText weight="bold" variant="subtitle" style={{ marginBottom: spacing.sm }}>About Venue</ThemedText>
+                        <ThemedText color="textSecondary" numberOfLines={4} style={{ lineHeight: 22 }}>
+                            {fullDescription}
+                        </ThemedText>
+                        <TouchableOpacity onPress={handleOpenBottomSheet} style={{ marginTop: spacing.sm }}>
+                            <ThemedText color="primary" weight="semibold">Read more</ThemedText>
+                        </TouchableOpacity>
+                    </View>
+
+                </ScrollView>
+
+                <BottomSheet
+                    ref={bottomSheetRef}
+                    index={-1}
+                    snapPoints={snapPoints}
+                    enablePanDownToClose={true}
+                    backdropComponent={renderBackdrop}
+                    backgroundStyle={{ backgroundColor: theme.card }}
+                    handleIndicatorStyle={{ backgroundColor: theme.border }}
+                >
+                    <BottomSheetScrollView contentContainerStyle={{ padding: spacing.xl }}>
+                        <ThemedText variant="title" weight="bold" style={{ marginBottom: spacing.md }}>
+                            About {venue.name}
+                        </ThemedText>
+                        <ThemedText style={{ lineHeight: 24, color: theme.textSecondary }}>
+                            {fullDescription}
+                        </ThemedText>
+                    </BottomSheetScrollView>
+                </BottomSheet>
+            </View>
+        );
+    }
 
 
 // --- Main Navigator ---
@@ -554,10 +647,23 @@ export const VenueDetailScreen: React.FC = () => {
     const { theme, isDark } = useTheme();
     const navigation = useNavigation();
     const route = useRoute<any>();
+    const { venueId } = route.params || {};
 
-    // Note: in a real app, we'd fetch venue data based on route.params.venueId
-    const venueName = "Narendra Modi Stadium";
-    const venueCity = "Ahmedabad";
+    const { data: venue, loading } = useFetch(
+        () => VenueService.getVenueDetails(venueId),
+        [venueId]
+    );
+
+    if (loading && !venue) {
+        return (
+            <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={theme.primary} />
+            </View>
+        );
+    }
+
+    const venueName = venue?.name || "Venue Details";
+    const venueCity = venue?.city || "";
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -571,7 +677,11 @@ export const VenueDetailScreen: React.FC = () => {
 
                     <View style={styles.headerContent}>
                         <View style={styles.imageContainer}>
-                            <ThemedText style={styles.emoji}>🏟️</ThemedText>
+                            {venue?.image ? (
+                                <Image source={{ uri: venue.image }} style={{ width: '100%', height: '100%', borderRadius: 30 }} />
+                            ) : (
+                                <ThemedText style={styles.emoji}>🏟️</ThemedText>
+                            )}
                         </View>
                         <View style={styles.headerInfo}>
                             <ThemedText variant="title" color="white" weight="bold">{venueName}</ThemedText>
@@ -593,11 +703,31 @@ export const VenueDetailScreen: React.FC = () => {
                     tabBarItemStyle: { width: width / 3.5 },
                 }}
             >
-                <TopTab.Screen name="Overview" component={OverviewTab} />
-                <TopTab.Screen name="Matches" component={MatchesTab} />
-                <TopTab.Screen name="Stats" component={StatsTab} />
-                <TopTab.Screen name="News" component={NewsTab} />
-                <TopTab.Screen name="About" component={AboutTab} />
+                <TopTab.Screen
+                    name="Overview"
+                    component={OverviewTab}
+                    initialParams={{ venueId }}
+                />
+                <TopTab.Screen
+                    name="Matches"
+                    component={MatchesTab}
+                    initialParams={{ venueId }}
+                />
+                <TopTab.Screen
+                    name="Stats"
+                    component={StatsTab}
+                    initialParams={{ venueId }}
+                />
+                <TopTab.Screen
+                    name="News"
+                    component={NewsTab}
+                    initialParams={{ venueId }}
+                />
+                <TopTab.Screen
+                    name="About"
+                    component={AboutTab}
+                    initialParams={{ venueId }}
+                />
             </TopTab.Navigator>
         </View>
     );

@@ -42,9 +42,12 @@ import {
     resetMatchState,
     setRefreshing,
     updateLiveStatusFromSocket,
-    updateCommentaryFromSocket
+    updateCommentaryFromSocket,
+    removeLatestCommentary
 } from '../store/matchSlice';
 import { MatchService } from '../services/match.service';
+import { setLanguage, toggleMute } from '../store/appSlice';
+import * as Speech from 'expo-speech';
 import { MatchDetailSkeleton, ScorecardBodySkeleton } from '../components/MatchDetailSkeleton';
 import { SessionsTable } from '../components/SessionsTable';
 import { RefreshControl } from 'react-native';
@@ -404,74 +407,98 @@ const CommentaryTab = ({ matchId }: { matchId: string }) => {
         dispatch(fetchCommentary(matchId));
     }, [dispatch, matchId]);
 
+    useEffect(() => {
+        if (__DEV__) {
+            console.log(`[CommentaryTab] reduxCommentary updated: count=${reduxCommentary?.length}`);
+        }
+    }, [reduxCommentary]);
+
     // Process commentary to add labels and sort
     const processedCommentary = useMemo(() => {
-        const baseList = Array.isArray(reduxCommentary) ? reduxCommentary : [];
+        try {
+            let baseList = Array.isArray(reduxCommentary) ? [...reduxCommentary] : [];
 
-        if (baseList.length === 0) {
-            // Fallback to liveStatus.recentBalls if REST is empty
-            const fallback = liveStatus?.recentBalls || [];
-            if (fallback.length === 0) return [];
-            // Map to add temporary keys for unique rendering
-            return [...fallback].reverse().map((item, idx) => ({
-                ...item,
-                _id: item._id || item.ballId || `fallback-${idx}`,
-                timestamp: item.timestamp || new Date()
-            }));
+            if (__DEV__ && baseList.length > 0) {
+                console.log(`[CommentaryTab] Processing ${baseList.length} items. First ID: ${baseList[0]?._id}`);
+            }
+
+            // Blend with fallback if empty or very small
+            if (baseList.length < 5) {
+                const fallback = liveStatus?.recentBalls || [];
+                fallback.forEach((f: any) => {
+                    const fTime = new Date(f.timestamp || 0).getTime();
+                    const exists = baseList.some((b: any) => new Date(b.timestamp || 0).getTime() === fTime);
+                    if (!exists) {
+                        baseList.push({
+                            ...f,
+                            _id: f._id || f.ballId || `fallback-${fTime}-${Math.random()}`,
+                            timestamp: f.timestamp || new Date().toISOString()
+                        });
+                    }
+                });
+            }
+
+            const combined = baseList.map((item, idx) => {
+                const label = item.ballLabel || '';
+                let r = Number(item.runs);
+
+                if (isNaN(r) || r === 0) {
+                    if (label.includes('6')) r = 6;
+                    else if (label.includes('4')) r = 4;
+                    else if (['1', '2', '3'].includes(label)) r = Number(label);
+                }
+
+                return {
+                    ...item,
+                    _id: item._id || item.ballId || `temp-${item.timestamp}-${idx}`,
+                    runs: r,
+                    isWicket: item.isWicket || item.type === 'wicket' || label.includes('W'),
+                };
+            });
+
+            const sorted = combined.sort((a, b) => {
+                const tA = new Date(a.timestamp || 0).getTime();
+                const tB = new Date(b.timestamp || 0).getTime();
+                return tA - tB;
+            });
+
+            const overCounters: Record<string, number> = {};
+
+            const withLabels = sorted.map(item => {
+                const type = item.type || 'ball';
+                const isDelivery = ['ball', 'wicket', 'milestone'].includes(type);
+
+                if (!isDelivery) return item;
+
+                const overNumber = item.overNumber || 1;
+                const inningId = item.inningId || 'default';
+                const overKey = `${inningId}-${overNumber}`;
+
+                if (overCounters[overKey] === undefined) overCounters[overKey] = 0;
+
+                let isLegalBall = item.isLegal;
+                if (isLegalBall === undefined) {
+                    const label = (item.ballLabel || '').toLowerCase();
+                    isLegalBall = !label.includes('wd') && !label.includes('nb');
+                }
+
+                if (isLegalBall) {
+                    overCounters[overKey]++;
+                }
+
+                const ballIndex = overCounters[overKey];
+                return {
+                    ...item,
+                    calculatedIndex: `${overNumber - 1}.${ballIndex}`,
+                    calculatedResult: item.ballLabel || (type === 'wicket' ? 'W' : '')
+                };
+            });
+
+            return [...withLabels].reverse();
+        } catch (error) {
+            console.error('[CommentaryTab] Error processing commentary:', error);
+            return [];
         }
-
-        const combined = [...baseList].map((item, idx) => {
-            const label = item.ballLabel || '';
-            let r = Number(item.runs);
-
-            // Normalize runs from label if missing
-            if (isNaN(r) || r === 0) {
-                if (label.includes('6')) r = 6;
-                else if (label.includes('4')) r = 4;
-                else if (['1', '2', '3'].includes(label)) r = Number(label);
-            }
-
-            return {
-                ...item,
-                _id: item._id || item.ballId || `temp-${idx}`,
-                runs: r,
-                isWicket: item.isWicket || item.type === 'wicket' || label.includes('W'),
-            };
-        });
-
-        // 1. Sort by timestamp ascending for sequential index calculation
-        const sorted = combined.sort((a, b) =>
-            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-        );
-
-        const overCounters: Record<string, number> = {};
-
-        const withLabels = sorted.map(item => {
-            const type = item.type || 'ball';
-            const isDelivery = ['ball', 'wicket', 'milestone'].includes(type);
-
-            if (!isDelivery) return item;
-
-            const overNumber = item.overNumber || 1;
-            const inningId = item.inningId || 'default';
-            const overKey = `${inningId}-${overNumber}`;
-
-            if (overCounters[overKey] === undefined) overCounters[overKey] = 0;
-
-            if (item.isLegal) {
-                overCounters[overKey]++;
-            }
-
-            const ballIndex = overCounters[overKey];
-            return {
-                ...item,
-                calculatedIndex: `${overNumber - 1}.${ballIndex}`,
-                calculatedResult: item.ballLabel || (type === 'wicket' ? 'W' : '')
-            };
-        });
-
-        // 2. Reverse for display (latest first)
-        return withLabels.reverse();
     }, [reduxCommentary, liveStatus]);
 
     const filteredCommentary = useMemo(() => {
@@ -546,7 +573,7 @@ const CommentaryTab = ({ matchId }: { matchId: string }) => {
         if (!data) return null;
 
         const initial = data.wicketBatsmanName?.charAt(0) || '?';
-        const sr = data.wicketBatsmanSR || (data.wicketBatsmanBalls > 0 ? ((data.wicketBatsmanRuns / data.wicketBatsmanBalls) * 100).toFixed(2) : '0.00');
+        const sr = data.wicketBatsmanSR !== undefined ? Number(data.wicketBatsmanSR).toFixed(2) : (data.wicketBatsmanBalls > 0 ? ((data.wicketBatsmanRuns / data.wicketBatsmanBalls) * 100).toFixed(2) : '0.00');
 
         return (
             <View key={item._id} style={styles.wicketCardContainer}>
@@ -593,7 +620,7 @@ const CommentaryTab = ({ matchId }: { matchId: string }) => {
                         </View>
                         <View style={styles.wicketStatItem}>
                             <ThemedText style={styles.wicketStatLabel}>SR</ThemedText>
-                            <ThemedText weight="bold" style={styles.wicketStatValue}>{sr.toFixed(2)}</ThemedText>
+                            <ThemedText weight="bold" style={styles.wicketStatValue}>{sr}</ThemedText>
                         </View>
                     </View>
                 </View>
@@ -757,6 +784,24 @@ const CommentaryTab = ({ matchId }: { matchId: string }) => {
                             return renderOverSummary(item);
                         }
 
+                        if (item.type === 'milestone') {
+                            return (
+                                <View key={item._id} style={[styles.commentaryItem, { borderBottomColor: theme.border + '30', backgroundColor: isDark ? 'rgba(234, 179, 8, 0.1)' : '#fefce8' }]}>
+                                    <View style={[styles.overColumn, { justifyContent: 'center' }]}>
+                                        <Ionicons name="star" size={24} color="#eab308" />
+                                    </View>
+                                    <View style={styles.commentaryText}>
+                                        <ThemedText weight="bold" color="primary" style={{ marginBottom: 4 }}>
+                                            MILESTONE
+                                        </ThemedText>
+                                        <ThemedText style={{ fontStyle: 'italic', color: isDark ? '#fde047' : '#854d0e' }}>
+                                            {item.commentary}
+                                        </ThemedText>
+                                    </View>
+                                </View>
+                            );
+                        }
+
                         return (
                             <React.Fragment key={item._id}>
                                 {isWicket && renderWicketCard(item)}
@@ -861,6 +906,7 @@ const CommentaryTab = ({ matchId }: { matchId: string }) => {
 };
 
 const ScorecardTab = ({ matchId }: { matchId: string }) => {
+    const navigation = useNavigation<MatchDetailNavigationProp>();
     const { theme, isDark } = useTheme();
     const dispatch = useAppDispatch();
     const { scorecard: reduxScorecard, refreshing, liveStatus, details: match } = useAppSelector(state => state.match);
@@ -983,23 +1029,28 @@ const ScorecardTab = ({ matchId }: { matchId: string }) => {
                             const isStriker = pId === currentStrikerIdStr;
 
                             return (
-                                <View key={pId || `bat-${idx}`} style={[styles.playerRow, { borderBottomColor: theme.border + '50' }]}>
-                                    <View style={styles.playerNameCol}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                            <ThemedText weight="semibold" style={{ color: isStriker ? theme.primary : theme.text }}>
-                                                {player.playerName || player.playerId?.name || 'Unknown'}
-                                            </ThemedText>
-                                            {isStriker && <Ionicons name="flashlight" size={12} color={theme.primary} style={styles.batIconSmall} />}
+                                <TouchableOpacity
+                                    key={pId || `bat-${idx}`}
+                                    onPress={() => navigation.navigate('PlayerProfile', { playerId: pId })}
+                                >
+                                    <View style={[styles.playerRow, { borderBottomColor: theme.border + '50' }]}>
+                                        <View style={styles.playerNameCol}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                                <ThemedText weight="semibold" style={{ color: isStriker ? theme.primary : theme.text }}>
+                                                    {player.playerName || player.playerId?.name || 'Unknown'}
+                                                </ThemedText>
+                                                {isStriker && <Ionicons name="flashlight" size={12} color={theme.primary} style={styles.batIconSmall} />}
+                                            </View>
+                                            <ThemedText variant="caption" color="textSecondary">{player.dismissalText || 'not out'}</ThemedText>
                                         </View>
-                                        <ThemedText variant="caption" color="textSecondary">{player.dismissalText || 'not out'}</ThemedText>
+                                        <View style={styles.scoreCols}>
+                                            <View style={styles.colStatFixed}><ThemedText weight="bold" style={{ textAlign: 'center' }}>{player.runs || 0}</ThemedText></View>
+                                            <View style={styles.colStatFixed}><ThemedText variant="small" style={{ textAlign: 'center' }}>{player.balls || 0}</ThemedText></View>
+                                            <View style={styles.colStatFixed}><ThemedText variant="small" style={{ textAlign: 'center' }}>{player.fours || 0}</ThemedText></View>
+                                            <View style={styles.colStatFixed}><ThemedText variant="small" style={{ textAlign: 'center' }}>{player.sixes || 0}</ThemedText></View>
+                                        </View>
                                     </View>
-                                    <View style={styles.scoreCols}>
-                                        <View style={styles.colStatFixed}><ThemedText weight="bold" style={{ textAlign: 'center' }}>{player.runs || 0}</ThemedText></View>
-                                        <View style={styles.colStatFixed}><ThemedText variant="small" style={{ textAlign: 'center' }}>{player.balls || 0}</ThemedText></View>
-                                        <View style={styles.colStatFixed}><ThemedText variant="small" style={{ textAlign: 'center' }}>{player.fours || 0}</ThemedText></View>
-                                        <View style={styles.colStatFixed}><ThemedText variant="small" style={{ textAlign: 'center' }}>{player.sixes || 0}</ThemedText></View>
-                                    </View>
-                                </View>
+                                </TouchableOpacity>
                             );
                         })}
 
@@ -1054,19 +1105,24 @@ const ScorecardTab = ({ matchId }: { matchId: string }) => {
                             const isBowler = pId === currentBowlerIdStr;
 
                             return (
-                                <View key={pId || `bowl-${idx}`} style={[styles.playerRow, { borderBottomColor: theme.border + '50' }]}>
-                                    <View style={styles.playerNameCol}>
-                                        <ThemedText weight="semibold" style={{ color: isBowler ? theme.primary : theme.text }}>
-                                            {bowler.playerName || bowler.playerId?.name || 'Unknown'}
-                                        </ThemedText>
+                                <TouchableOpacity
+                                    key={pId || `bowl-${idx}`}
+                                    onPress={() => navigation.navigate('PlayerProfile', { playerId: pId })}
+                                >
+                                    <View style={[styles.playerRow, { borderBottomColor: theme.border + '50' }]}>
+                                        <View style={styles.playerNameCol}>
+                                            <ThemedText weight="semibold" style={{ color: isBowler ? theme.primary : theme.text }}>
+                                                {bowler.playerName || bowler.playerId?.name || 'Unknown'}
+                                            </ThemedText>
+                                        </View>
+                                        <View style={styles.scoreCols}>
+                                            <View style={styles.colStatFixed}><ThemedText variant="small" style={{ textAlign: 'center' }}>{bowler.overs || '0.0'}</ThemedText></View>
+                                            <View style={styles.colStatFixed}><ThemedText variant="small" style={{ textAlign: 'center' }}>{bowler.maidens || 0}</ThemedText></View>
+                                            <View style={styles.colStatFixed}><ThemedText variant="small" style={{ textAlign: 'center' }}>{bowler.runs || 0}</ThemedText></View>
+                                            <View style={styles.colStatFixed}><ThemedText weight="bold" style={{ textAlign: 'center' }}>{bowler.wickets || 0}</ThemedText></View>
+                                        </View>
                                     </View>
-                                    <View style={styles.scoreCols}>
-                                        <View style={styles.colStatFixed}><ThemedText variant="small" style={{ textAlign: 'center' }}>{bowler.overs || '0.0'}</ThemedText></View>
-                                        <View style={styles.colStatFixed}><ThemedText variant="small" style={{ textAlign: 'center' }}>{bowler.maidens || 0}</ThemedText></View>
-                                        <View style={styles.colStatFixed}><ThemedText variant="small" style={{ textAlign: 'center' }}>{bowler.runs || 0}</ThemedText></View>
-                                        <View style={styles.colStatFixed}><ThemedText weight="bold" style={{ textAlign: 'center' }}>{bowler.wickets || 0}</ThemedText></View>
-                                    </View>
-                                </View>
+                                </TouchableOpacity>
                             );
                         })}
                     </Card>
@@ -1320,7 +1376,7 @@ const ScoreSummaryHeader = ({ liveStatus, match, isConnected }: { liveStatus: an
                 {isScheduled ? (
                     <ThemedText color="white" variant="small" style={{ opacity: 0.8 }}>Countdown to Toss</ThemedText>
                 ) : !isCompleted ? (
-                    <ThemedText color="white" variant="small" style={{ opacity: 0.8 }}>CRR: {crr?.toFixed(2)}</ThemedText>
+                    <ThemedText color="white" variant="small" style={{ opacity: 0.8 }}>CRR: {Number(crr || 0).toFixed(2)}</ThemedText>
                 ) : (
                     <ThemedText color="white" variant="small" style={{ opacity: 0.8 }}>Match Concluded</ThemedText>
                 )}
@@ -1731,7 +1787,7 @@ const LiveTab = ({ matchId, onTeamPress }: { matchId: string; onTeamPress: (inde
                         )}
 
                         {/* Lambi Row */}
-                        {(liveStatus?.lambi !== undefined || liveStatus?.lambiBlue !== undefined || liveStatus?.lambiRed !== undefined) && (
+                        {(liveStatus?.lambi || liveStatus?.lambiBlue || liveStatus?.lambiRed) && (
                             <View style={[styles.sessionRow, { backgroundColor: 'transparent', paddingHorizontal: spacing.xs, height: 40, borderBottomWidth: (sessionsData && sessionsData.length > 0) ? StyleSheet.hairlineWidth : 0, borderBottomColor: theme.border }]}>
                                 <View style={{ flex: 1 }}>
                                     <ThemedText weight="bold" variant="small">{liveStatus.lambi ? `${liveStatus.lambi} Overs` : 'Inning Fixed'}</ThemedText>
@@ -1798,6 +1854,11 @@ const LiveTab = ({ matchId, onTeamPress }: { matchId: string; onTeamPress: (inde
                                     <View style={[styles.colBatter, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
                                         <ThemedText
                                             weight="bold"
+                                            onPress={() => {
+                                                navigation.navigate('PlayerProfile', {
+                                                    playerId: pId,
+                                                });
+                                            }}
                                             style={{ color: isStriker ? theme.primary : (isDark ? 'rgba(255,255,255,0.7)' : theme.textSecondary) }}
                                         >
                                             {player.playerName || player.name || player.playerId?.name || 'Player'}
@@ -2690,6 +2751,10 @@ export const MatchDetailScreen: React.FC = () => {
 
 
 
+    const currentInning = liveStatus?.currentInning || 1;
+    const loadingMatch = loading.details;
+    const loadingStatus = loading.liveStatus;
+
     // On WICKET or OVER_END, do a lightweight REST refresh (scorecard via socket already updates the tab)
     useEffect(() => {
         if (!matchUpdate) return;
@@ -2698,16 +2763,22 @@ export const MatchDetailScreen: React.FC = () => {
             dispatch(fetchRecentOvers({ matchId, inning: currentInning }));
             dispatch(fetchSessions(matchId));
         }
-    }, [matchUpdate?.type, matchUpdate?.timestamp, matchId, dispatch]);
 
-    const currentInning = liveStatus?.currentInning || 1;
-    const loadingMatch = loading.details;
-    const loadingStatus = loading.liveStatus;
+        // If the backend sent an UNDO (currentBall = 'confirming'), we must fetch a fresh commentary 
+        // list so we can remove the deleted ball and any deleted highlights.
+        if (matchUpdate.currentBall === 'confirming') {
+            dispatch(removeLatestCommentary());
+            // We can optionally refresh recent overs if needed, but it's not absolutely necessary
+            dispatch(fetchRecentOvers({ matchId, inning: currentInning }));
+        }
+    }, [matchUpdate?.type, matchUpdate?.timestamp, matchUpdate?.currentBall, matchId, dispatch, currentInning]);
 
     const currentScorecard = reduxScorecard[currentInning];
 
     const [selectedTeamIndex, setSelectedTeamIndex] = useState<0 | 1 | null>(null);
-    const [sheetType, setSheetType] = useState<'squad' | 'fantasy-all' | 'analysis'>('squad');
+    const [sheetType, setSheetType] = useState<'squad' | 'fantasy-all' | 'analysis' | 'language'>('squad');
+    const appLanguage = useAppSelector(state => state.app.language);
+    const isMuted = useAppSelector(state => state.app.isMuted);
     const [analysisTab, setAnalysisTab] = useState('mostRuns');
 
     const bottomSheetRef = useRef<BottomSheet>(null);
@@ -2841,14 +2912,20 @@ export const MatchDetailScreen: React.FC = () => {
                             </View>
                         </View>
                         <View style={styles.navRight}>
+                            <TouchableOpacity style={styles.headerIcon} onPress={() => dispatch(toggleMute())}>
+                                <Ionicons name={isMuted ? "volume-mute" : "volume-high"} size={20} color="white" />
+                            </TouchableOpacity>
                             <TouchableOpacity style={styles.headerIcon} onPress={() => navigation.navigate('MatchLedger', { matchId })}>
                                 <Ionicons name="pin-outline" size={20} color="white" />
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.headerIcon}>
                                 <Ionicons name="notifications-outline" size={20} color="white" />
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.headerIcon}>
-                                <Ionicons name="ellipsis-horizontal" size={20} color="white" />
+                            <TouchableOpacity style={styles.headerIcon} onPress={() => {
+                                setSheetType('language');
+                                bottomSheetRef.current?.expand();
+                            }}>
+                                <Ionicons name="ellipsis-vertical" size={20} color="white" />
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -3092,6 +3169,41 @@ export const MatchDetailScreen: React.FC = () => {
                                                         Math.floor(Math.random() * 500)}
                                         </ThemedText>
                                     </View>
+                                ))}
+                            </View>
+                        </>
+                    )}
+
+                    {sheetType === 'language' && (
+                        <>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg }}>
+                                <ThemedText variant="subtitle" weight="bold">Commentary Language</ThemedText>
+                                <TouchableOpacity onPress={() => bottomSheetRef.current?.close()}>
+                                    <Ionicons name="close" size={24} color={theme.text} />
+                                </TouchableOpacity>
+                            </View>
+                            <View style={{ gap: spacing.md }}>
+                                {[
+                                    { code: 'en', label: 'English', demo: 'Language set to English' },
+                                    { code: 'hi', label: 'Hindi (हिंदी)', demo: 'भाषा हिंदी में सेट हो गई है' },
+                                    { code: 'ta', label: 'Tamil (தமிழ்)', demo: 'Mozhi thamizhukku maatrapattadhu' }
+                                ].map(lang => (
+                                    <TouchableOpacity
+                                        key={lang.code}
+                                        style={[styles.statListCard, { backgroundColor: appLanguage === lang.code ? theme.primary + '20' : (isDark ? 'rgba(255,255,255,0.05)' : theme.borderLight), borderColor: appLanguage === lang.code ? theme.primary : 'transparent' }]}
+                                        onPress={() => {
+                                            dispatch(setLanguage(lang.code as 'en' | 'hi' | 'ta'));
+                                            Speech.stop();
+                                            Speech.speak(lang.demo, { language: lang.code, pitch: 1, rate: 1.1 });
+                                            setTimeout(() => bottomSheetRef.current?.close(), 500);
+                                        }}
+                                    >
+                                        <Ionicons name="language-outline" size={24} color={appLanguage === lang.code ? theme.primary : theme.textSecondary} />
+                                        <View style={{ flex: 1, marginLeft: spacing.md }}>
+                                            <ThemedText weight="bold" color={appLanguage === lang.code ? 'primary' : 'text'}>{lang.label}</ThemedText>
+                                        </View>
+                                        {appLanguage === lang.code && <Ionicons name="checkmark-circle" size={24} color={theme.primary} />}
+                                    </TouchableOpacity>
                                 ))}
                             </View>
                         </>

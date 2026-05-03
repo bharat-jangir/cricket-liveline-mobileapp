@@ -121,11 +121,15 @@ const MainTabNavigator = () => {
 };
 
 const AppNavigator = () => {
-  const { theme, isOnboardingCompleted } = useTheme();
+  const { theme, isOnboardingCompleted, isSettingsLoaded } = useTheme();
+
+  // Prevent flashing the wrong screen while settings are loading from AsyncStorage
+  if (!isSettingsLoaded) {
+    return null;
+  }
 
   return (
     <Stack.Navigator
-      initialRouteName={isOnboardingCompleted ? "Splash" : "Onboarding"}
       screenOptions={{
         headerStyle: {
           backgroundColor: theme.surface,
@@ -140,88 +144,91 @@ const AppNavigator = () => {
         cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
       }}
     >
-      {!isOnboardingCompleted && (
+      {!isOnboardingCompleted ? (
         <Stack.Screen
           name="Onboarding"
           component={OnboardingScreen}
           options={{ headerShown: false }}
         />
+      ) : (
+        <>
+          <Stack.Screen
+            name="Splash"
+            component={SplashScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="ProfileMenu"
+            component={ProfileMenuScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="GlobalSearch"
+            component={GlobalSearchScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Rankings"
+            component={RankingsScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="AllNews"
+            component={AllNewsScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="NewsDetail"
+            component={NewsDetailScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="SeriesDetail"
+            component={SeriesDetailScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="VenueDetail"
+            component={VenueDetailScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="AllVenues"
+            component={AllVenuesScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="AllPlayers"
+            component={AllPlayersScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="MatchDetails"
+            component={MatchDetailScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="MatchLedger"
+            component={MatchLedgerScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="PlayerProfile"
+            component={PlayerProfileScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Login"
+            component={LoginScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Main"
+            component={MainTabNavigator}
+            options={{ headerShown: false }}
+          />
+        </>
       )}
-      <Stack.Screen
-        name="Splash"
-        component={SplashScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="ProfileMenu"
-        component={ProfileMenuScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="GlobalSearch"
-        component={GlobalSearchScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="Rankings"
-        component={RankingsScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="AllNews"
-        component={AllNewsScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="NewsDetail"
-        component={NewsDetailScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="SeriesDetail"
-        component={SeriesDetailScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="VenueDetail"
-        component={VenueDetailScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="AllVenues"
-        component={AllVenuesScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="AllPlayers"
-        component={AllPlayersScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="MatchDetails"
-        component={MatchDetailScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="MatchLedger"
-        component={MatchLedgerScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="PlayerProfile"
-        component={PlayerProfileScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="Login"
-        component={LoginScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="Main"
-        component={MainTabNavigator}
-        options={{ headerShown: false }}
-      />
     </Stack.Navigator>
   );
 };

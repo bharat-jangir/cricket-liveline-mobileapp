@@ -8,14 +8,16 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useDispatch } from 'react-redux';
+import { useAppSelector } from '../store/hooks';
 import { io, Socket } from 'socket.io-client';
 import { AppState } from 'react-native';
 import { Audio } from 'expo-av';
+import * as Speech from 'expo-speech';
 import { SOCKET_URL } from '../services/socketClient';
-import { 
-  updateLiveStatusFromSocket, 
-  updateInningFromSocket, 
-  updateOddsFromSocket, 
+import {
+  updateLiveStatusFromSocket,
+  updateInningFromSocket,
+  updateOddsFromSocket,
   updatePowerplayFromSocket,
   updateCommentaryFromSocket,
   updateScorecardFromSocket,
@@ -105,9 +107,10 @@ export interface MatchUpdate {
   matchId: string;
   type: 'BALL' | 'WICKET' | 'OVER_END' | 'MATCH_RESET';
   timestamp: string;
-  
+
   // Generalized root-level fields
   score?: string;
+  onOc?: boolean;
   overs?: string | number;
   runRate?: number;
   currentBall?: string;
@@ -165,7 +168,12 @@ export interface ScorecardDelta {
 }
 
 export interface CommentaryItem {
+  _id?: string;
+  type?: string;
+  isLegal?: boolean;
   matchId: string;
+  inningId: string;
+  onOc?: boolean;
   inningNumber: number;
   overNumber: number;
   ballLabel: string;
@@ -207,7 +215,25 @@ interface UseLiveMatchReturn {
 export function useLiveMatch(matchId: string | null): UseLiveMatchReturn {
   const socketRef = useRef<Socket | null>(null);
   const dispatch = useDispatch();
+  const appLanguage = useAppSelector(state => state.app.language);
+  const isMuted = useAppSelector(state => state.app.isMuted);
+  const liveStatus = useAppSelector(state => state.match.liveStatus);
+  const languageRef = useRef(appLanguage);
+  const isMutedRef = useRef(isMuted);
+  const liveStatusRef = useRef(liveStatus);
   const ballSoundRef = useRef<Audio.Sound | null>(null);
+
+  useEffect(() => {
+    languageRef.current = appLanguage;
+  }, [appLanguage]);
+
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
+
+  useEffect(() => {
+    liveStatusRef.current = liveStatus;
+  }, [liveStatus]);
 
   // Initialize audio mode
   useEffect(() => {
@@ -230,35 +256,32 @@ export function useLiveMatch(matchId: string | null): UseLiveMatchReturn {
     setupAudio();
   }, []);
 
-  // Play ball sound helper
-  const playBallSound = useCallback(async () => {
+  // TTS Speech helper
+  const speakEvent = useCallback((textToSpeak: string) => {
     try {
-      const state = AppState.currentState;
-      console.log(`[useLiveMatch] Attempting to play sound. AppState: ${state}`);
-      
-      if (state !== 'active') {
-        console.log('[useLiveMatch] Audio suppressed: App is in background');
+      if (isMutedRef.current) {
+        console.log('[useLiveMatch] Speech suppressed: isMuted is true');
         return;
       }
-      
-      // Create and play
-      console.log('[useLiveMatch] Loading sound object...');
-      const { sound } = await Audio.Sound.createAsync(
-        require('../../assets/ball-event-audios/Ball start ball.wav'),
-        { shouldPlay: true }
-      );
-      
-      console.log('[useLiveMatch] Sound loaded and playing');
-      
-      // Auto-unload after playback finishes to free memory
-      sound.setOnPlaybackStatusUpdate((status: any) => {
-        if (status.didJustFinish) {
-          console.log('[useLiveMatch] Sound finished, unloading...');
-          sound.unloadAsync();
-        }
+
+      const state = AppState.currentState;
+      if (state !== 'active') {
+        console.log('[useLiveMatch] Speech suppressed: App is in background');
+        return;
+      }
+
+      // Stop any existing speech to ensure 0-1ms perceived latency for the new event
+      Speech.stop();
+
+      console.log(`[useLiveMatch] Speaking: "${textToSpeak}"`);
+      // Use expo-speech, no object recreation needed, very low latency
+      Speech.speak(textToSpeak, {
+        language: languageRef.current,
+        pitch: 1.0,
+        rate: languageRef.current === 'ta' ? 1.0 : 1.1,
       });
     } catch (error) {
-      console.warn('[useLiveMatch] Error playing sound:', error);
+      console.warn('[useLiveMatch] Error speaking event:', error);
     }
   }, []);
 
@@ -316,17 +339,69 @@ export function useLiveMatch(matchId: string | null): UseLiveMatchReturn {
     // Unified Match Update Handler
     const handleMatchUpdate = (data: MatchUpdate, isLegacy = false) => {
       console.log(`[useLiveMatch] Match Update RECEIVED (${isLegacy ? 'legacy' : 'scoreUpdate'}):`, data.timestamp);
-      
+
       // Update local state and Redux
       setMatchUpdate(data);
       dispatch(updateLiveStatusFromSocket(data));
 
-      // Trigger audio on 'b' or 'B' events
+      // Trigger TTS for ball events
       const curBall = data.currentBall;
       console.log(`[useLiveMatch] currentBall: "${curBall}"`);
-      if (curBall === 'b' || curBall === 'B' || curBall === 'ball' || curBall === 'Ball') {
-        console.log('[useLiveMatch] Triggering PLAY for ball event');
-        playBallSound();
+      const lang = languageRef.current;
+
+      // Over Commentary logic removed from here and moved to powerplay_update
+      // where the backend sends the onOC flag.
+
+      if (curBall) {
+        const lowerBall = curBall.toLowerCase();
+        let textToSpeak = '';
+
+        const isNewOver = lowerBall === 'b' || lowerBall === 'ball';
+        const oversVal = Number(data.overs || 0);
+        const overNum = Math.floor(oversVal) + 1;
+        const ballsCompleted = Math.round((oversVal - Math.floor(oversVal)) * 10);
+        // If it's a new ball, the ball being bowled is ballsCompleted + 1
+        const ballNum = Math.min(ballsCompleted + 1, 6);
+
+        const hiOrdinals = ['pehli', 'doosri', 'teesri', 'chauthi', 'paanchvi', 'chhati'];
+        const taOrdinals = ['mudhal', 'irandavathu', 'moondravathu', 'naangavathu', 'aindhavathu', 'aaraavathu'];
+        const enOrdinals = ['First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth'];
+
+        const getOrdinal = (num: number, langCode: string) => {
+            const idx = Math.max(0, num - 1);
+            if (langCode === 'hi') return hiOrdinals[idx] || hiOrdinals[0];
+            if (langCode === 'ta') return taOrdinals[idx] || taOrdinals[0];
+            return enOrdinals[idx] || enOrdinals[0];
+        };
+        
+        if (isNewOver) {
+          if (lang === 'hi') textToSpeak = `${overNum}ve over ki ${getOrdinal(ballNum, 'hi')} ball`;
+          else if (lang === 'ta') textToSpeak = `${overNum} vadhu over in ${getOrdinal(ballNum, 'ta')} pandhu`;
+          else textToSpeak = `${getOrdinal(ballNum, 'en')} ball of the ${overNum}th over`;
+        } else if (lowerBall === '4') {
+          textToSpeak = lang === 'hi' ? 'chauka aaya chauka' : lang === 'ta' ? 'four, nangu rangal' : 'four runs';
+        } else if (lowerBall === '6') {
+          textToSpeak = lang === 'hi' ? 'chhakka aaya chhakka' : lang === 'ta' ? 'six, aaru rangal' : 'six runs';
+        } else if (lowerBall === 'w') {
+          textToSpeak = lang === 'hi' ? 'wicket aaya wicket' : lang === 'ta' ? 'wicket, out' : 'wicket falls';
+        } else if (lowerBall === 'wd') {
+          textToSpeak = lang === 'hi' ? 'wide ball' : lang === 'ta' ? 'wide pandhu' : 'wide ball';
+        } else if (lowerBall === 'nb') {
+          textToSpeak = 'no ball';
+        } else if (lowerBall === 'lb') {
+          textToSpeak = 'leg bye';
+        } else if (lowerBall === '1' || lowerBall === '2' || lowerBall === '3' || lowerBall === '5') {
+          textToSpeak = lang === 'en' ? `${lowerBall} run${lowerBall !== '1' ? 's' : ''}` : `${lowerBall} run`;
+        } else if (lowerBall === '0') {
+          textToSpeak = lang === 'hi' ? 'dot ball zero run' : lang === 'ta' ? 'dot ball, zero run' : 'dot ball, no run';
+        } else {
+          textToSpeak = lowerBall;
+        }
+
+        if (textToSpeak) {
+          console.log(`[useLiveMatch] Triggering TTS: ${textToSpeak}`);
+          speakEvent(textToSpeak);
+        }
       }
     };
 
@@ -355,6 +430,20 @@ export function useLiveMatch(matchId: string | null): UseLiveMatchReturn {
       console.log('[useLiveMatch] powerplay_update RECEIVED');
       setPowerplayUpdate(data);
       dispatch(updatePowerplayFromSocket(data));
+
+      if (data.onOC || (data as any).onOc) {
+        const lang = languageRef.current;
+        const runs = liveStatusRef.current?.inning?.totalRuns ?? 0;
+        const wks = liveStatusRef.current?.inning?.wickets ?? 0;
+        
+        let ocText = '';
+        if (lang === 'hi') ocText = `${runs} run, ${wks} wicket par`;
+        else if (lang === 'ta') ocText = `${runs} run, ${wks} wicketku`;
+        else ocText = `${runs} for ${wks} wicket${Number(wks) !== 1 ? 's' : ''}`;
+        
+        console.log(`[useLiveMatch] Triggering Over Summary TTS: ${ocText}`);
+        speakEvent(ocText);
+      }
     });
 
     // Note: match_reset is now unified into scoreUpdate for better consistency
@@ -369,10 +458,17 @@ export function useLiveMatch(matchId: string | null): UseLiveMatchReturn {
 
     // Single ball commentary entry — prepend to list
     socket.on('commentary_added', (data: CommentaryItem) => {
-      console.log('[useLiveMatch] commentary_added RECEIVED:', JSON.stringify(data, null, 2));
-      setCommentary((prev) => [data, ...prev].slice(0, 200));
-      setLatestCommentary(data);
-      dispatch(updateCommentaryFromSocket(data));
+      // Map ballType to type to match the REST API format
+      const mappedData = {
+        ...data,
+        type: data.type || (data as any).ballType || 'ball',
+        _id: data._id || `temp-${Date.now()}`
+      };
+      
+      console.log('[useLiveMatch] commentary_added RECEIVED:', JSON.stringify(mappedData, null, 2));
+      setCommentary((prev) => [mappedData, ...prev].slice(0, 200));
+      setLatestCommentary(mappedData);
+      dispatch(updateCommentaryFromSocket(mappedData));
     });
 
     socket.on('connect_error', (err) => {

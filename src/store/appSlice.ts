@@ -1,22 +1,24 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 export interface AppState {
-  language: string;
+  language: 'en' | 'hi' | 'ta';
   isDark: boolean;
   isOnboardingComplete: boolean;
+  isMuted: boolean;
 }
 
 const initialState: AppState = {
-  language: 'English',
+  language: 'en',
   isDark: false,
   isOnboardingComplete: false,
+  isMuted: false,
 };
 
 const appSlice = createSlice({
   name: 'app',
   initialState,
   reducers: {
-    setLanguage: (state, action: PayloadAction<string>) => {
+    setLanguage: (state, action: PayloadAction<'en' | 'hi' | 'ta'>) => {
       state.language = action.payload;
     },
     toggleTheme: (state) => {
@@ -28,8 +30,11 @@ const appSlice = createSlice({
     completeOnboarding: (state) => {
       state.isOnboardingComplete = true;
     },
+    toggleMute: (state) => {
+      state.isMuted = !state.isMuted;
+    },
   },
 });
 
-export const { setLanguage, toggleTheme, setTheme, completeOnboarding } = appSlice.actions;
+export const { setLanguage, toggleTheme, setTheme, completeOnboarding, toggleMute } = appSlice.actions;
 export default appSlice.reducer;

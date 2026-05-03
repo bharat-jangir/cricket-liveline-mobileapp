@@ -281,11 +281,41 @@ const matchSlice = createSlice({
     },
     updateCommentaryFromSocket: (state, action: PayloadAction<any>) => {
       const newItem = action.payload;
-      // De-duplicate based on timestamp which is reliable for ball events
-      const exists = state.commentary.some(c => c.timestamp === newItem.timestamp);
+      if (!newItem || !newItem.timestamp) return;
+
+      const newItemTime = new Date(newItem.timestamp).getTime();
+      const exists = state.commentary.some(c => {
+        const cTime = new Date(c.timestamp).getTime();
+        return cTime === newItemTime;
+      });
+      
       if (!exists) {
+        if (__DEV__) {
+          console.log(`[matchSlice] Adding NEW commentary: ${newItem.ballLabel} - ${newItem.commentary?.substring(0, 20)}...`);
+        }
+        // Prepend new item and keep only latest 100
         state.commentary = [newItem, ...state.commentary].slice(0, 100);
+      } else if (__DEV__) {
+        console.log(`[matchSlice] Commentary already exists, skipping: ${newItem.ballLabel}`);
       }
+    },
+    removeLatestCommentary: (state) => {
+      // Find and remove the latest ball/wicket and potentially the over_end if it was just added
+      // We look at the first few items because over_end and ball might be pushed at the same time
+      const itemsToRemove: number[] = [];
+      let ballRemoved = false;
+      
+      for (let i = 0; i < Math.min(3, state.commentary.length); i++) {
+        const item = state.commentary[i];
+        if (item.type === 'over_end' || item.type === 'milestone') {
+            itemsToRemove.push(i);
+        } else if (!ballRemoved && (item.type === 'ball' || item.type === 'wicket' || !item.type)) {
+            itemsToRemove.push(i);
+            ballRemoved = true;
+        }
+      }
+      
+      state.commentary = state.commentary.filter((_, idx) => !itemsToRemove.includes(idx));
     },
     updateScorecardFromSocket: (state, action: PayloadAction<any>) => {
       const payload = action.payload;
@@ -479,6 +509,7 @@ export const {
     updateOddsFromSocket,
     updatePowerplayFromSocket,
     updateCommentaryFromSocket,
+    removeLatestCommentary,
     updateScorecardFromSocket,
     updateSessionsFromSocket
 } = matchSlice.actions;

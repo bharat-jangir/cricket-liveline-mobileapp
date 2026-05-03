@@ -1,13 +1,15 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, Image, SafeAreaView, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, Image, SafeAreaView, ActivityIndicator, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../theme/ThemeContext';
-import { mockVenues, Venue } from '../data/mockData';
 import { spacing, borderRadius } from '../theme';
 import { Text as ThemedText } from '../components/ui/Text';
+import { VenueService } from '../services/venue.service';
+import { usePagination } from '../hooks/usePagination';
+import { useDebounce } from '../hooks/useDebounce';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -15,22 +17,26 @@ export const AllVenuesScreen: React.FC = () => {
     const { theme, isDark } = useTheme();
     const navigation = useNavigation<NavigationProp>();
     const [searchQuery, setSearchQuery] = useState('');
-    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const debouncedSearch = useDebounce(searchQuery, 500);
 
-    // Simulated pagination logic for API expansion
-    const handleLoadMore = useCallback(() => {
-        // Prevent loading if already loading, or if we have an active search query.
-        if (isLoadingMore || searchQuery.length > 0) return;
+    const {
+        items: venues,
+        loading,
+        loadingMore,
+        refreshing,
+        loadMore,
+        refresh
+    } = usePagination<any>(
+        (params) => VenueService.getVenues({ ...params, search: debouncedSearch }),
+        [debouncedSearch]
+    );
 
-        setIsLoadingMore(true);
-        // Simulate network delay for fetching the next page
-        setTimeout(() => {
-            setIsLoadingMore(false);
-        }, 1500);
-    }, [isLoadingMore, searchQuery]);
+    const onRefresh = React.useCallback(() => {
+        refresh();
+    }, [refresh]);
 
     const renderFooter = () => {
-        if (!isLoadingMore) return null;
+        if (!loadingMore) return null;
         return (
             <View style={{ paddingVertical: spacing.md, alignItems: 'center' }}>
                 <ActivityIndicator size="small" color={theme.primary} />
@@ -38,24 +44,14 @@ export const AllVenuesScreen: React.FC = () => {
         );
     };
 
-    const filteredVenues = useMemo(() => {
-        if (!searchQuery) return mockVenues;
-        const lowerQuery = searchQuery.toLowerCase();
-        return mockVenues.filter(venue =>
-            venue.name.toLowerCase().includes(lowerQuery) ||
-            venue.city.toLowerCase().includes(lowerQuery) ||
-            venue.country.toLowerCase().includes(lowerQuery)
-        );
-    }, [searchQuery]);
-
-    const renderVenueItem = ({ item }: { item: Venue }) => (
+    const renderVenueItem = ({ item }: { item: any }) => (
         <TouchableOpacity
             style={[styles.venueCard, { backgroundColor: theme.card, borderColor: theme.border }]}
             onPress={() => navigation.navigate('VenueDetail', { venueId: item.id })}
             activeOpacity={0.7}
         >
             <Image
-                source={{ uri: item.image }}
+                source={{ uri: item.image || item.venueImage }}
                 style={[styles.venueImage, { backgroundColor: isDark ? theme.border : '#f0f0f0' }]}
                 resizeMode="cover"
             />
@@ -121,21 +117,31 @@ export const AllVenuesScreen: React.FC = () => {
 
             {/* Venue List */}
             <FlatList
-                data={filteredVenues}
-                keyExtractor={(item) => item.id}
+                data={venues}
+                keyExtractor={(item) => item._id || item.id}
                 renderItem={renderVenueItem}
                 contentContainerStyle={styles.listContainer}
                 showsVerticalScrollIndicator={false}
-                onEndReached={handleLoadMore}
+                onEndReached={loadMore}
                 onEndReachedThreshold={0.5}
-                ListFooterComponent={searchQuery ? undefined : renderFooter}
+                ListFooterComponent={renderFooter}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor={theme.primary}
+                        colors={[theme.primary]}
+                    />
+                }
                 ListEmptyComponent={() => (
+                    !loading && !refreshing ? (
                     <View style={styles.emptyContainer}>
                         <Ionicons name="search-outline" size={48} color={theme.border} />
                         <ThemedText color="textSecondary" style={styles.emptyText}>
                             No venues found matching "{searchQuery}"
                         </ThemedText>
                     </View>
+                    ) : null
                 )}
             />
         </SafeAreaView>

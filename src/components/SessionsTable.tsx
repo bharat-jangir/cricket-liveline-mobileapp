@@ -29,13 +29,13 @@ export const SessionsTable: React.FC<SessionsTableProps> = ({ sessions }) => {
     <Card style={styles.container}>
       <View style={styles.titleRow}>
         <ThemedText variant="small" weight="bold" color="textSecondary">
-          Live Sessions
+          Sessions Table
         </ThemedText>
-        <View style={styles.badge}>
+        {/* <View style={styles.badge}>
           <ThemedText variant="caption" weight="bold" color="primary">LIVE</ThemedText>
-        </View>
+        </View> */}
       </View>
-      
+
       <View style={styles.header}>
         <ThemedText variant="caption" weight="bold" style={styles.headerLabel}>SESSION</ThemedText>
         <ThemedText variant="caption" weight="bold" style={styles.headerLabel}>OPEN</ThemedText>
@@ -50,10 +50,10 @@ export const SessionsTable: React.FC<SessionsTableProps> = ({ sessions }) => {
         const statusIcon = diff > 0 ? '>' : (diff < 0 ? '<' : '=');
 
         return (
-          <View 
-            key={item._id || index} 
+          <View
+            key={item._id || index}
             style={[
-              styles.row, 
+              styles.row,
               { borderBottomColor: theme.border + '20' },
               index === sessions.length - 1 && { borderBottomWidth: 0 }
             ]}
@@ -63,13 +63,13 @@ export const SessionsTable: React.FC<SessionsTableProps> = ({ sessions }) => {
                 {item.session} Over
               </ThemedText>
             </View>
-            
+
             <ThemedText weight="medium" style={[styles.cell, { fontSize: 13 }]}>{item.open}</ThemedText>
-            
+
             <View style={[styles.cell, { flexDirection: 'row', alignItems: 'center', gap: 2 }]}>
-               <ThemedText weight="bold" style={{ color: statusColor, fontSize: 13 }}>{statusIcon} {item.pass}</ThemedText>
+              <ThemedText weight="bold" style={{ color: statusColor, fontSize: 13 }}>{statusIcon} {item.pass}</ThemedText>
             </View>
-            
+
             <ThemedText variant="caption" weight="bold" style={styles.cell}>{item.min}</ThemedText>
             <ThemedText variant="caption" weight="bold" style={[styles.cell, { textAlign: 'right' }]}>{item.max}</ThemedText>
           </View>

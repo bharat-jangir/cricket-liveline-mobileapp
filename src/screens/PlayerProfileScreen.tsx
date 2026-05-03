@@ -10,10 +10,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/ThemeContext';
 import { spacing, borderRadius, fontSize } from '../theme';
 import { Text as ThemedText } from '../components/ui/Text';
-import { mockPlayers, Player, PlayerStats, completedMatches, Match } from '../data/mockData';
+import { PlayerService, PlayerProfile, PlayerStats } from '../services/player.service';
+import { useFetch } from '../hooks/useFetch';
 import { PlayerProvider, usePlayerContext } from '../contexts/PlayerContext';
 import { MatchCard } from '../components/MatchCard';
-// import { Text } from 'react-native-gesture-handler'; // Removed incorrect import
+import { ActivityIndicator } from 'react-native';
+import { Match } from '@/data/mockData';
 
 const TopTab = createMaterialTopTabNavigator();
 const { width } = Dimensions.get('window');
@@ -22,24 +24,24 @@ type StatFormat = 'test' | 'odi' | 't20i';
 
 // --- Tab Components ---
 
-const OverviewTab = ({ player }: { player: Player }) => {
+const OverviewTab = ({ player }: { player: PlayerProfile }) => {
     const { theme, isDark } = useTheme();
     const { statMode } = usePlayerContext();
     const [activeFormat, setActiveFormat] = useState<StatFormat>('odi');
     const { width: windowWidth } = useWindowDimensions();
 
+    const { data: stats, loading } = useFetch(
+        () => PlayerService.getPlayerStats((player as any)._id || player.id, activeFormat),
+        [(player as any)._id || player.id, activeFormat]
+    );
+
     const numColumns = windowWidth > 900 ? 4 : windowWidth > 600 ? 3 : 2;
-    // Calculate precise width: Total Container (windowWidth - outer padding) - total inner gap margins
     const availableWidth = windowWidth - (spacing.md * 2) - (spacing.lg * 2);
-    // Subtract gap spacing explicitly, then divide by columns. 
-    // We subtract a tiny extra pixel fraction (.1) to ensure floating point math doesn't overflow the flex row.
     const gapTotal = spacing.sm * (numColumns - 1);
     const boxWidth = ((availableWidth - gapTotal) / numColumns) - 0.1;
 
-    const currentStats: PlayerStats | undefined = player.stats[activeFormat];
-
-    const renderStatBox = (label: string, value?: string) => {
-        if (!value) return null;
+    const renderStatBox = (label: string, value?: string | number) => {
+        if (value === undefined || value === null) return null;
         return (
             <View style={[styles.statBox, { width: boxWidth, backgroundColor: theme.card, shadowColor: theme.shadow, borderColor: theme.border }]}>
                 <ThemedText variant="caption" color="textSecondary" weight="medium" style={{ letterSpacing: 0.5 }}>{label.toUpperCase()}</ThemedText>
@@ -73,25 +75,29 @@ const OverviewTab = ({ player }: { player: Player }) => {
                     ))}
                 </View>
 
-                {currentStats ? (
+                {loading ? (
+                    <View style={styles.emptyState}>
+                        <ActivityIndicator color={theme.primary} />
+                    </View>
+                ) : stats ? (
                     <View style={styles.statsGrid}>
-                        {renderStatBox('Matches', currentStats.matches)}
+                        {renderStatBox('Matches', stats.matches)}
                         {statMode === 'Batting' ? (
                             <>
-                                {renderStatBox('Runs', currentStats.runs)}
-                                {renderStatBox('Average', currentStats.average)}
-                                {renderStatBox('Strike Rate', currentStats.strikeRate)}
-                                {renderStatBox('High Score', currentStats.highScore)}
-                                {renderStatBox('100s', currentStats.hundreds)}
-                                {renderStatBox('50s', currentStats.fifties)}
+                                {renderStatBox('Runs', stats.runs)}
+                                {renderStatBox('Average', stats.average)}
+                                {renderStatBox('Strike Rate', stats.strikeRate)}
+                                {renderStatBox('High Score', stats.highScore)}
+                                {renderStatBox('100s', stats.hundreds)}
+                                {renderStatBox('50s', stats.fifties)}
                             </>
                         ) : (
                             <>
-                                {renderStatBox('Wickets', currentStats.wickets)}
-                                {renderStatBox('Average', currentStats.average)}
-                                {renderStatBox('Economy', currentStats.economy || '-')}
-                                {renderStatBox('Best Bowling', currentStats.bestBowling)}
-                                {renderStatBox('5 Wickets', currentStats.fiveWickets)}
+                                {renderStatBox('Wickets', stats.wickets)}
+                                {renderStatBox('Average', stats.average)}
+                                {renderStatBox('Economy', stats.economy || '-')}
+                                {renderStatBox('Best Bowling', stats.bestBowling)}
+                                {renderStatBox('5 Wickets', stats.fiveWickets)}
                             </>
                         )}
                     </View>
@@ -136,23 +142,13 @@ const SeriesAccordion = ({ series, matches }: { series: string, matches: Match[]
 };
 
 const MatchesTab = () => {
-    const { theme, isDark } = useTheme();
-
-    // Group completed matches by series
-    const groupedMatches = completedMatches.reduce((acc, match) => {
-        if (!acc[match.series]) {
-            acc[match.series] = [];
-        }
-        acc[match.series].push(match);
-        return acc;
-    }, {} as Record<string, Match[]>);
+    const { theme } = useTheme();
 
     return (
         <ScrollView style={{ flex: 1, backgroundColor: theme.background }} contentContainerStyle={styles.tabContent}>
-            <View style={{ gap: spacing.md }}>
-                {Object.entries(groupedMatches).map(([series, matches]) => (
-                    <SeriesAccordion key={series} series={series} matches={matches} />
-                ))}
+            <View style={styles.emptyState}>
+                <Ionicons name="calendar-outline" size={48} color={theme.textSecondary} style={{ opacity: 0.5 }} />
+                <ThemedText color="textSecondary" style={{ marginTop: spacing.md }}>Match history coming soon</ThemedText>
             </View>
         </ScrollView>
     );
@@ -198,7 +194,7 @@ const NewsTab = () => {
     );
 };
 
-const PlayerInfoTab = ({ player }: { player: Player }) => {
+const PlayerInfoTab = ({ player }: { player: PlayerProfile }) => {
     const { theme, isDark } = useTheme();
     return (
         <ScrollView style={{ flex: 1, backgroundColor: theme.background }} contentContainerStyle={styles.tabContent}>
@@ -210,20 +206,20 @@ const PlayerInfoTab = ({ player }: { player: Player }) => {
                 <View style={styles.infoGrid}>
                     <View style={styles.infoCol}>
                         <ThemedText variant="caption" color="textSecondary" style={{ marginBottom: 4 }}>BORN</ThemedText>
-                        <ThemedText weight="bold" numberOfLines={2}>{player.birthPlace}</ThemedText>
-                        <ThemedText variant="caption" color="textSecondary" style={{ marginTop: 2 }}>Age: {player.age}</ThemedText>
+                        <ThemedText weight="bold" numberOfLines={2}>{player.birthPlace || 'N/A'}</ThemedText>
+                        <ThemedText variant="caption" color="textSecondary" style={{ marginTop: 2 }}>Age: {player.age || 'N/A'}</ThemedText>
                     </View>
                     <View style={styles.infoCol}>
                         <ThemedText variant="caption" color="textSecondary" style={{ marginBottom: 4 }}>BATTING STYLE</ThemedText>
-                        <ThemedText weight="bold">{player.battingStyle}</ThemedText>
+                        <ThemedText weight="bold">{player.battingStyle || 'N/A'}</ThemedText>
                     </View>
                     <View style={styles.infoCol}>
                         <ThemedText variant="caption" color="textSecondary" style={{ marginBottom: 4 }}>BOWLING STYLE</ThemedText>
-                        <ThemedText weight="bold">{player.bowlingStyle}</ThemedText>
+                        <ThemedText weight="bold">{player.bowlingStyle || 'N/A'}</ThemedText>
                     </View>
                     <View style={styles.infoCol}>
                         <ThemedText variant="caption" color="textSecondary" style={{ marginBottom: 4 }}>TEAMS</ThemedText>
-                        <ThemedText weight="bold" numberOfLines={3} style={{ lineHeight: 22 }}>{player.teams.join(', ')}</ThemedText>
+                        <ThemedText weight="bold" numberOfLines={3} style={{ lineHeight: 22 }}>{player.teams?.join(', ') || 'N/A'}</ThemedText>
                     </View>
                 </View>
             </View>
@@ -233,7 +229,7 @@ const PlayerInfoTab = ({ player }: { player: Player }) => {
 
 // --- Main Screen Container ---
 
-const PlayerProfileContent = ({ player }: { player: Player }) => {
+const PlayerProfileContent = ({ player }: { player: PlayerProfile }) => {
     const { theme, isDark } = useTheme();
     const navigation = useNavigation();
     const { statMode, toggleStatMode } = usePlayerContext();
@@ -244,10 +240,6 @@ const PlayerProfileContent = ({ player }: { player: Player }) => {
             transform: [{ scale: scale.value }]
         };
     });
-
-    const handleToggle = () => {
-        toggleStatMode();
-    };
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -271,7 +263,13 @@ const PlayerProfileContent = ({ player }: { player: Player }) => {
                         </ThemedText>
                     </View>
                     <View style={styles.heroImageWrapper}>
-                        <Image source={{ uri: player.image }} style={styles.heroImage} />
+                        {player.image ? (
+                            <Image source={{ uri: player.image }} style={styles.heroImage} />
+                        ) : (
+                            <View style={[styles.heroImage, { backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' }]}>
+                                <Ionicons name="person" size={40} color="white" />
+                            </View>
+                        )}
                     </View>
                 </View>
             </View>
@@ -342,12 +340,24 @@ export const PlayerProfileScreen: React.FC = () => {
     const route = useRoute<any>();
     const navigation = useNavigation();
 
-    const { playerId } = route.params;
-    const player = mockPlayers.find(p => p.id === playerId);
+    const { playerId } = route.params || {};
+
+    const { data: player, loading } = useFetch(
+        () => PlayerService.getPlayerDetails(playerId),
+        [playerId]
+    );
+
+    if (loading && !player) {
+        return (
+            <SafeAreaView style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={theme.primary} />
+            </SafeAreaView>
+        );
+    }
 
     if (!player) {
         return (
-            <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+            <SafeAreaView style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }]}>
                 <ThemedText>Player not found.</ThemedText>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: spacing.md }}>
                     <ThemedText color="primary">Go Back</ThemedText>

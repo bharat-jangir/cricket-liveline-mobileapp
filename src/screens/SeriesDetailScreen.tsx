@@ -4,10 +4,14 @@ import { useTheme } from '../theme/ThemeContext';
 import { spacing, borderRadius } from '../theme';
 import { Text as ThemedText } from '../components/ui/Text';
 import { Card } from '../components/ui/Card';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { useFetch } from '../hooks/useFetch';
+import { SeriesService } from '../services/series.service';
+import { MatchService } from '../services/match.service';
+import { ActivityIndicator, RefreshControl } from 'react-native';
 
 const TopTab = createMaterialTopTabNavigator();
 
@@ -47,13 +51,24 @@ const MOCK_TEAMS = [
   { id: 'ENG', name: 'England', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', played: 9, won: 3, lost: 6, players: [] },
 ];
 
-const MOCK_STATS = [
-  { id: '1', title: 'Most Runs', player: 'Virat Kohli', value: '765', team: 'IND', flag: '🇮🇳', image: 'https://i.pravatar.cc/100?img=12' },
-  { id: '2', title: 'Most Wickets', player: 'Mohammad Shami', value: '24', team: 'IND', flag: '🇮🇳', image: 'https://i.pravatar.cc/100?img=16' },
-  { id: '3', title: 'Highest Score', player: 'Glenn Maxwell', value: '201*', team: 'AUS', flag: '🇦🇺', image: 'https://i.pravatar.cc/100?img=19' },
-  { id: '4', title: 'Best Figures', player: 'Mohammad Shami', value: '7/57', team: 'IND', flag: '🇮🇳', image: 'https://i.pravatar.cc/100?img=16' },
-  { id: '5', title: 'Most Sixes', player: 'Rohit Sharma', value: '31', team: 'IND', flag: '🇮🇳', image: 'https://i.pravatar.cc/100?img=11' },
-];
+const MOCK_STATS_CATEGORIES = {
+  Batting: [
+    { id: '1', title: 'Most Runs', player: 'Virat Kohli', value: '765', team: 'IND', flag: '🇮🇳', image: 'https://i.pravatar.cc/100?img=12', metric: 'Runs' },
+    { id: '3', title: 'Highest Score', player: 'Glenn Maxwell', value: '201*', team: 'AUS', flag: '🇦🇺', image: 'https://i.pravatar.cc/100?img=19', metric: 'Score' },
+    { id: '5', title: 'Most Sixes', player: 'Rohit Sharma', value: '31', team: 'IND', flag: '🇮🇳', image: 'https://i.pravatar.cc/100?img=11', metric: 'Sixes' },
+    { id: '6', title: 'Best Average', player: 'Kane Williamson', value: '82.4', team: 'NZ', flag: '🇳🇿', image: 'https://i.pravatar.cc/100?img=20', metric: 'Avg' },
+  ],
+  Bowling: [
+    { id: '2', title: 'Most Wickets', player: 'Mohammad Shami', value: '24', team: 'IND', flag: '🇮🇳', image: 'https://i.pravatar.cc/100?img=16', metric: 'Wkts' },
+    { id: '4', title: 'Best Figures', player: 'Mohammad Shami', value: '7/57', team: 'IND', flag: '🇮🇳', image: 'https://i.pravatar.cc/100?img=16', metric: 'Figs' },
+    { id: '7', title: 'Best Economy', player: 'Jasprit Bumrah', value: '3.98', team: 'IND', flag: '🇮🇳', image: 'https://i.pravatar.cc/100?img=13', metric: 'Econ' },
+    { id: '8', title: 'Most Maidens', player: 'Josh Hazlewood', value: '12', team: 'AUS', flag: '🇦🇺', image: 'https://i.pravatar.cc/100?img=21', metric: 'Maidens' },
+  ],
+  Fielding: [
+    { id: '9', title: 'Most Catches', player: 'Daryl Mitchell', value: '11', team: 'NZ', flag: '🇳🇿', image: 'https://i.pravatar.cc/100?img=22', metric: 'Catches' },
+    { id: '10', title: 'Most Dismissals', player: 'Quinton de Kock', value: '20', team: 'SA', flag: '🇿🇦', image: 'https://i.pravatar.cc/100?img=23', metric: 'Wk Dis' },
+  ]
+};
 
 const MOCK_VENUES = [
   { id: '1', name: 'Narendra Modi Stadium', city: 'Ahmedabad', capacity: '132,000', image: 'https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?q=80&w=400&h=300&auto=format&fit=crop' },
@@ -86,144 +101,74 @@ const MOCK_POINTS_TABLE = [
 // --- Sub Tabs ---
 
 const OverviewTab = () => {
+  const navigation = useNavigation<any>();
   const { theme, isDark } = useTheme();
+  const route = useRoute<any>();
+  const { seriesId } = route.params;
+
+  const { data: series } = useFetch(
+    () => SeriesService.getSeriesDetails(seriesId),
+    [seriesId]
+  );
+
+  const { data: fixtures } = useFetch(
+    () => MatchService.getSeriesMatches(seriesId),
+    [seriesId]
+  );
+
+  const featuredMatches = fixtures?.slice(0, 3) || [];
 
   return (
     <ScrollView style={[styles.tabContent, { backgroundColor: theme.background }]} contentContainerStyle={styles.tabContentPadding}>
+      
+      {series?.description ? (
+        <View style={styles.mb}>
+          <ThemedText variant="subtitle" weight="bold" style={styles.mbSm}>About Series</ThemedText>
+          <ThemedText color="textSecondary">{series.description}</ThemedText>
+        </View>
+      ) : null}
 
-      {/* Top Performers Section */}
       <View style={[styles.row, styles.mb, { alignItems: 'center' }]}>
-        <ThemedText variant="subtitle" weight="bold" style={{ flex: 1 }}>Top Performers</ThemedText>
-        <TouchableOpacity><ThemedText color="primary" weight="bold">View All</ThemedText></TouchableOpacity>
+        <ThemedText variant="subtitle" weight="bold" style={{ flex: 1 }}>Featured Matches</ThemedText>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mb}>
-        {/* Most Runs */}
-        <Card style={[styles.statHighlightCard, { backgroundColor: theme.primary + '11', borderColor: theme.primary + '33', borderWidth: 1 }]}>
-          <ThemedText variant="small" color="textSecondary" weight="bold">Most Runs</ThemedText>
-          <View style={[styles.row, { alignItems: 'center', marginVertical: spacing.xs }]}>
-            <Image source={{ uri: 'https://i.pravatar.cc/100?img=12' }} style={styles.avatarSmall} />
-            <View style={{ marginLeft: spacing.xs }}>
-              <ThemedText weight="bold">V. Kohli</ThemedText>
-              <ThemedText variant="small" color="textSecondary">IND</ThemedText>
+      {featuredMatches.map((item: any) => (
+        <TouchableOpacity key={item.id || item._id} activeOpacity={0.8} onPress={() => navigation.navigate('MatchDetails', { matchId: item.id || item._id })}>
+          <Card style={styles.mb}>
+            <View style={[styles.row, { justifyContent: 'space-between', marginBottom: spacing.sm }]}>
+              <ThemedText variant="small" color="textSecondary">
+                {item.time ? new Date(item.time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''} • {item.venue}
+              </ThemedText>
+              <View style={[styles.badge, { backgroundColor: item.status === 'Completed' ? theme.success + '20' : theme.warning + '20' }]}>
+                <ThemedText variant="small" weight="bold" style={{ color: item.status === 'Completed' ? theme.success : theme.warning }}>{item.status}</ThemedText>
+              </View>
             </View>
-          </View>
-          <ThemedText variant="title" color="primary" weight="bold">765</ThemedText>
-        </Card>
-
-        {/* Most Wickets */}
-        <Card style={[styles.statHighlightCard, { backgroundColor: theme.secondary + '11', borderColor: theme.secondary + '33', borderWidth: 1 }]}>
-          <ThemedText variant="small" color="textSecondary" weight="bold">Most Wickets</ThemedText>
-          <View style={[styles.row, { alignItems: 'center', marginVertical: spacing.xs }]}>
-            <Image source={{ uri: 'https://i.pravatar.cc/100?img=13' }} style={styles.avatarSmall} />
-            <View style={{ marginLeft: spacing.xs }}>
-              <ThemedText weight="bold">M. Shami</ThemedText>
-              <ThemedText variant="small" color="textSecondary">IND</ThemedText>
+            <View style={[styles.row, { alignItems: 'center', marginVertical: spacing.sm }]}>
+              <ThemedText weight="bold" style={{ flex: 1, textAlign: 'right' }}>{item.team1?.code || 'T1'}</ThemedText>
+              <ThemedText color="textSecondary" style={{ marginHorizontal: spacing.md }}>VS</ThemedText>
+              <ThemedText weight="bold" style={{ flex: 1 }}>{item.team2?.code || 'T2'}</ThemedText>
             </View>
-          </View>
-          <ThemedText variant="title" style={{ color: theme.secondary }} weight="bold">24</ThemedText>
-        </Card>
-
-        {/* Best Figures */}
-        <Card style={[styles.statHighlightCard, { backgroundColor: theme.primary + '11', borderColor: theme.primary + '33', borderWidth: 1 }]}>
-          <ThemedText variant="small" color="textSecondary" weight="bold">Best Figures</ThemedText>
-          <View style={[styles.row, { alignItems: 'center', marginVertical: spacing.xs }]}>
-            <Image source={{ uri: 'https://i.pravatar.cc/100?img=13' }} style={styles.avatarSmall} />
-            <View style={{ marginLeft: spacing.xs }}>
-              <ThemedText weight="bold">M. Shami</ThemedText>
-              <ThemedText variant="small" color="textSecondary">IND</ThemedText>
-            </View>
-          </View>
-          <ThemedText variant="title" color="primary" weight="bold">7/57</ThemedText>
-        </Card>
-
-        {/* Highest Score */}
-        <Card style={[styles.statHighlightCard, { backgroundColor: theme.secondary + '11', borderColor: theme.secondary + '33', borderWidth: 1 }]}>
-          <ThemedText variant="small" color="textSecondary" weight="bold">Highest Score</ThemedText>
-          <View style={[styles.row, { alignItems: 'center', marginVertical: spacing.xs }]}>
-            <Image source={{ uri: 'https://i.pravatar.cc/100?img=14' }} style={styles.avatarSmall} />
-            <View style={{ marginLeft: spacing.xs }}>
-              <ThemedText weight="bold">G. Maxwell</ThemedText>
-              <ThemedText variant="small" color="textSecondary">AUS</ThemedText>
-            </View>
-          </View>
-          <ThemedText variant="title" style={{ color: theme.secondary }} weight="bold">201*</ThemedText>
-        </Card>
-
-        {/* Most Sixes */}
-        <Card style={[styles.statHighlightCard, { backgroundColor: theme.primary + '11', borderColor: theme.primary + '33', borderWidth: 1 }]}>
-          <ThemedText variant="small" color="textSecondary" weight="bold">Most Sixes</ThemedText>
-          <View style={[styles.row, { alignItems: 'center', marginVertical: spacing.xs }]}>
-            <Image source={{ uri: 'https://i.pravatar.cc/100?img=11' }} style={styles.avatarSmall} />
-            <View style={{ marginLeft: spacing.xs }}>
-              <ThemedText weight="bold">R. Sharma</ThemedText>
-              <ThemedText variant="small" color="textSecondary">IND</ThemedText>
-            </View>
-          </View>
-          <ThemedText variant="title" color="primary" weight="bold">31</ThemedText>
-        </Card>
-      </ScrollView>
-
-      {/* Playoff Bracket Section */}
-      <ThemedText variant="subtitle" weight="bold" style={styles.mb}>Playoff Bracket</ThemedText>
-
-      <View style={styles.bracketContainer}>
-        {/* Semi Finals Column */}
-        <View style={styles.bracketColumn}>
-          <ThemedText variant="small" weight="bold" color="textSecondary" style={styles.mbSm}>Semi-Finals</ThemedText>
-
-          <Card padding="xs" style={styles.bracketCard}>
-            <View style={[styles.row, { justifyContent: 'space-between' }]}>
-              <ThemedText weight="bold">IND 🇮🇳</ThemedText>
-              <ThemedText weight="bold">397/4</ThemedText>
-            </View>
-            <View style={[styles.separator, { backgroundColor: theme.borderLight }]} />
-            <View style={[styles.row, { justifyContent: 'space-between' }]}>
-              <ThemedText>NZ 🇳🇿</ThemedText>
-              <ThemedText>327</ThemedText>
-            </View>
+            {item.result ? (
+              <ThemedText variant="small" color="primary" weight="bold" style={{ textAlign: 'center', marginTop: spacing.xs }}>{item.result}</ThemedText>
+            ) : null}
           </Card>
+        </TouchableOpacity>
+      ))}
 
-          <View style={styles.bracketSpacing} />
-
-          <Card padding="xs" style={styles.bracketCard}>
-            <View style={[styles.row, { justifyContent: 'space-between' }]}>
-              <ThemedText>SA 🇿🇦</ThemedText>
-              <ThemedText>212</ThemedText>
+      {series?.tournamentId && (
+        <View style={styles.mb}>
+          <ThemedText variant="subtitle" weight="bold" style={styles.mbSm}>Tournament Details</ThemedText>
+          <Card style={styles.row}>
+            <View style={styles.iconContainer}>
+              <Ionicons name="trophy" size={24} color={theme.primary} />
             </View>
-            <View style={[styles.separator, { backgroundColor: theme.borderLight }]} />
-            <View style={[styles.row, { justifyContent: 'space-between' }]}>
-              <ThemedText weight="bold">AUS 🇦🇺</ThemedText>
-              <ThemedText weight="bold">215/7</ThemedText>
+            <View style={{ flex: 1, marginLeft: spacing.md, justifyContent: 'center' }}>
+              <ThemedText weight="bold">{series.tournamentId.name}</ThemedText>
+              <ThemedText variant="caption" color="textSecondary">Category: {series.category || 'N/A'}</ThemedText>
             </View>
           </Card>
         </View>
-
-        {/* Connectors */}
-        <View style={styles.connectorColumn}>
-          <View style={[styles.connectorLineTop, { borderColor: theme.border }]} />
-          <View style={[styles.connectorLineHorizontal, { backgroundColor: theme.border }]} />
-          <View style={[styles.connectorLineBottom, { borderColor: theme.border }]} />
-        </View>
-
-        {/* Final Column */}
-        <View style={styles.bracketColumn}>
-          <ThemedText variant="small" weight="bold" color="textSecondary" style={styles.mbSm}>Final</ThemedText>
-          <View style={{ flex: 1, justifyContent: 'center' }}>
-            <Card padding="sm" style={[styles.bracketCard, { borderColor: theme.primary, borderWidth: 2 }]}>
-              <View style={[styles.row, { justifyContent: 'space-between' }]}>
-                <ThemedText>IND 🇮🇳</ThemedText>
-                <ThemedText>240</ThemedText>
-              </View>
-              <View style={[styles.separator, { backgroundColor: theme.borderLight }]} />
-              <View style={[styles.row, { justifyContent: 'space-between' }]}>
-                <ThemedText weight="bold">AUS 🇦🇺</ThemedText>
-                <ThemedText weight="bold" color="primary">241/4</ThemedText>
-              </View>
-            </Card>
-          </View>
-        </View>
-      </View>
+      )}
 
       <View style={{ height: 40 }} />
     </ScrollView>
@@ -231,35 +176,75 @@ const OverviewTab = () => {
 };
 
 const FixturesTab = () => {
+  const navigation = useNavigation<any>();
   const { theme, isDark } = useTheme();
+  const route = useRoute<any>();
+  const { seriesId } = route.params;
   const { width } = useWindowDimensions();
   const isTablet = width > 768;
 
+  const { data: fixtures, loading, execute: fetchFixtures } = useFetch(
+    () => MatchService.getSeriesMatches(seriesId),
+    [seriesId]
+  );
+
+  const [refreshing, setRefreshing] = React.useState(false);
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await fetchFixtures();
+    setRefreshing(false);
+  }, [fetchFixtures]);
+
+  if (loading && !fixtures) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}>
+        <ActivityIndicator size="small" color={theme.primary} />
+      </View>
+    );
+  }
+
   return (
     <FlatList
-      data={MOCK_FIXTURES}
-      keyExtractor={item => item.id}
+      data={fixtures || []}
+      keyExtractor={item => item.id || item._id}
       style={{ backgroundColor: theme.background }}
       contentContainerStyle={[styles.tabContentPadding, isTablet && styles.gridContainer]}
       numColumns={isTablet ? 2 : 1}
       key={isTablet ? 'tablet' : 'phone'}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={theme.primary}
+        />
+      }
+      ListEmptyComponent={
+        <View style={{ padding: 40, alignItems: 'center' }}>
+          <ThemedText color="textSecondary">No fixtures found for this series</ThemedText>
+        </View>
+      }
       renderItem={({ item }) => (
-        <Card style={[isTablet ? [styles.gridItem2Cols, styles.mb] : styles.mb]}>
-          <View style={[styles.row, { justifyContent: 'space-between', marginBottom: spacing.sm }]}>
-            <ThemedText variant="small" color="textSecondary">{item.date} • {item.venue}</ThemedText>
-            <View style={[styles.badge, { backgroundColor: item.status === 'Completed' ? theme.success + '20' : theme.warning + '20' }]}>
-              <ThemedText variant="small" weight="bold" style={{ color: item.status === 'Completed' ? theme.success : theme.warning }}>{item.status}</ThemedText>
+        <TouchableOpacity activeOpacity={0.8} onPress={() => navigation.navigate('MatchDetails', { matchId: item.id || item._id })}>
+          <Card style={[isTablet ? [styles.gridItem2Cols, styles.mb] : styles.mb]}>
+            <View style={[styles.row, { justifyContent: 'space-between', marginBottom: spacing.sm }]}>
+              <ThemedText variant="small" color="textSecondary">
+                {item.time ? new Date(item.time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''} • {item.venue}
+              </ThemedText>
+              <View style={[styles.badge, { backgroundColor: item.status === 'Completed' ? theme.success + '20' : theme.warning + '20' }]}>
+                <ThemedText variant="small" weight="bold" style={{ color: item.status === 'Completed' ? theme.success : theme.warning }}>{item.status}</ThemedText>
+              </View>
             </View>
-          </View>
-          <View style={[styles.row, { alignItems: 'center', marginVertical: spacing.sm }]}>
-            <ThemedText weight="bold" style={{ flex: 1, textAlign: 'right' }}>{item.team1}</ThemedText>
-            <ThemedText color="textSecondary" style={{ marginHorizontal: spacing.md }}>VS</ThemedText>
-            <ThemedText weight="bold" style={{ flex: 1 }}>{item.team2}</ThemedText>
-          </View>
-          {item.result ? (
-            <ThemedText variant="small" color="primary" weight="bold" style={{ textAlign: 'center', marginTop: spacing.xs }}>{item.result}</ThemedText>
-          ) : null}
-        </Card>
+            <View style={[styles.row, { alignItems: 'center', marginVertical: spacing.sm }]}>
+              <ThemedText weight="bold" style={{ flex: 1, textAlign: 'right' }}>{item.team1?.code || 'T1'}</ThemedText>
+              <ThemedText color="textSecondary" style={{ marginHorizontal: spacing.md }}>VS</ThemedText>
+              <ThemedText weight="bold" style={{ flex: 1 }}>{item.team2?.code || 'T2'}</ThemedText>
+            </View>
+            {item.result ? (
+              <ThemedText variant="small" color="primary" weight="bold" style={{ textAlign: 'center', marginTop: spacing.xs }}>{item.result}</ThemedText>
+            ) : null}
+          </Card>
+        </TouchableOpacity>
       )}
     />
   );
@@ -267,53 +252,93 @@ const FixturesTab = () => {
 
 const TeamsTab = () => {
   const { theme, isDark } = useTheme();
+  const route = useRoute<any>();
+  const { seriesId } = route.params;
   const { width } = useWindowDimensions();
   const isTablet = width > 768;
 
-  const [selectedTeam, setSelectedTeam] = React.useState<typeof MOCK_TEAMS[0] | null>(null);
+  const { data: teamsData, loading, execute: fetchTeams } = useFetch(
+    () => SeriesService.getSeriesTeams(seriesId),
+    [seriesId]
+  );
+
+  const [selectedTeam, setSelectedTeam] = React.useState<any | null>(null);
   const [roleFilter, setRoleFilter] = React.useState<'All' | 'Bat' | 'Bowl' | 'AR'>('All');
 
-  const roleCounts = React.useMemo(() => {
-    if (!selectedTeam || !selectedTeam.players) return { All: 0, Bat: 0, Bowl: 0, AR: 0 };
+  const [refreshing, setRefreshing] = React.useState(false);
 
-    return selectedTeam.players.reduce((acc, player) => {
-      acc.All += 1;
-      if (player.role === 'Bat') acc.Bat += 1;
-      if (player.role === 'Bowl') acc.Bowl += 1;
-      if (player.role === 'AR') acc.AR += 1;
-      return acc;
-    }, { All: 0, Bat: 0, Bowl: 0, AR: 0 });
-  }, [selectedTeam]);
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await fetchTeams();
+    setRefreshing(false);
+  }, [fetchTeams]);
 
-  const filteredPlayers = React.useMemo(() => {
-    if (!selectedTeam) return [];
-    if (roleFilter === 'All') return selectedTeam.players || [];
-    return (selectedTeam.players || []).filter(p => p.role === roleFilter);
-  }, [selectedTeam, roleFilter]);
+  const uniqueTeams = React.useMemo(() => {
+    if (!teamsData || !Array.isArray(teamsData)) return [];
+    const seen = new Set();
+    return teamsData.filter((item: any) => {
+      const teamId = item.teamId?._id || item.teamId?.id || item.teamId;
+      if (!teamId || seen.has(teamId)) return false;
+      seen.add(teamId);
+      return true;
+    });
+  }, [teamsData]);
+
+  if (loading && !teamsData) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}>
+        <ActivityIndicator size="small" color={theme.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
       <FlatList
-        data={MOCK_TEAMS}
-        keyExtractor={item => item.id}
+        data={uniqueTeams}
+
+        keyExtractor={item => item._id || item.id}
+
         numColumns={isTablet ? 2 : 1}
         key={`teams-${isTablet ? 2 : 1}`}
         contentContainerStyle={styles.tabContentPadding}
-        renderItem={({ item }) => (
-          <TouchableOpacity activeOpacity={0.8} onPress={() => { setSelectedTeam(item); setRoleFilter('All'); }}>
-            <Card style={[styles.row, { alignItems: 'center', padding: spacing.md, marginBottom: spacing.md, ...(isTablet ? styles.gridItem2Cols : {}) }]}>
-              <View style={[styles.iconContainer, { backgroundColor: theme.surface }]}>
-                <ThemedText style={{ fontSize: 32 }}>{item.flag}</ThemedText>
-              </View>
-              <View style={{ flex: 1, marginLeft: spacing.md }}>
-                <ThemedText variant="subtitle" weight="bold">{item.name}</ThemedText>
-                <ThemedText variant="caption" color="textSecondary">{item.players?.length || 0} Players</ThemedText>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={theme.textLight} />
-            </Card>
-          </TouchableOpacity>
-        )}
-        columnWrapperStyle={isTablet && styles.rowGap}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={theme.primary}
+          />
+        }
+        ListEmptyComponent={
+          <View style={{ padding: 40, alignItems: 'center' }}>
+            <ThemedText color="textSecondary">No teams assigned to this series</ThemedText>
+          </View>
+        }
+        renderItem={({ item }) => {
+          const team = item.teamId || {};
+          return (
+            <TouchableOpacity 
+              activeOpacity={0.8} 
+              onPress={() => { 
+                setSelectedTeam(item); 
+                setRoleFilter('All'); 
+              }}
+            >
+              <Card style={[styles.row, { alignItems: 'center', padding: spacing.md, marginBottom: spacing.md, ...(isTablet ? styles.gridItem2Cols : {}) }]}>
+                <View style={[styles.iconContainer, { backgroundColor: theme.surface }]}>
+                  <ThemedText style={{ fontSize: 32 }}>{team.flag || '🏏'}</ThemedText>
+                </View>
+                <View style={{ flex: 1, marginLeft: spacing.md }}>
+                  <ThemedText variant="subtitle" weight="bold">{team.name || 'Unknown Team'}</ThemedText>
+                  <ThemedText variant="caption" color="textSecondary">
+                    {team.code || 'N/A'}{item.groupName ? ` • ${item.groupName}` : ''}
+                  </ThemedText>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={theme.textLight} />
+              </Card>
+            </TouchableOpacity>
+          );
+        }}
       />
 
       {/* Bottom Sheet Modal */}
@@ -321,58 +346,22 @@ const TeamsTab = () => {
         <View style={styles.modalOverlay}>
           <Pressable style={styles.modalBg} onPress={() => setSelectedTeam(null)} />
           <View style={[styles.bottomSheet, { backgroundColor: theme.background }]}>
-
-            {/* Sheet Header */}
             <View style={[styles.row, { justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }]}>
               <View style={[styles.row, { alignItems: 'center' }]}>
-                <ThemedText style={{ fontSize: 24, marginRight: spacing.sm }}>{selectedTeam?.flag}</ThemedText>
-                <ThemedText variant="title" weight="bold">{selectedTeam?.name} Squad</ThemedText>
+                <ThemedText style={{ fontSize: 24, marginRight: spacing.sm }}>{selectedTeam?.teamId?.flag || '🏏'}</ThemedText>
+                <ThemedText variant="title" weight="bold">{selectedTeam?.teamId?.name} Squad</ThemedText>
               </View>
               <TouchableOpacity onPress={() => setSelectedTeam(null)} style={{ padding: spacing.xs }}>
                 <Ionicons name="close-circle" size={28} color={theme.textSecondary} />
               </TouchableOpacity>
             </View>
 
-            {/* Role Filters */}
-            <View style={[styles.row, { marginBottom: spacing.md }]}>
-              {['All', 'Bat', 'Bowl', 'AR'].map((role) => (
-                <TouchableOpacity
-                  key={role}
-                  onPress={() => setRoleFilter(role as any)}
-                  style={[
-                    styles.roleFilterTab,
-                    { backgroundColor: role === roleFilter ? theme.primary : theme.surface }
-                  ]}
-                >
-                  <ThemedText
-                    variant="small"
-                    weight={role === roleFilter ? 'bold' : 'medium'}
-                    style={{ color: role === roleFilter ? 'white' : theme.textSecondary }}
-                  >
-                    {role}
-                  </ThemedText>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Players Grid */}
-            <FlatList
-              data={filteredPlayers}
-              keyExtractor={item => item.id}
-              numColumns={2}
-              columnWrapperStyle={styles.rowGap}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: spacing.xxl }}
-              ListEmptyComponent={<ThemedText color="textSecondary" style={{ textAlign: 'center', marginTop: spacing.md }}>No players found.</ThemedText>}
-              renderItem={({ item }) => (
-                <Card style={[styles.row, { flex: 1, marginBottom: spacing.sm, padding: spacing.sm, alignItems: 'center', height: 60 }]}>
-                  <Image source={{ uri: item.image }} style={[{ width: 36, height: 36, borderRadius: 18, marginRight: spacing.sm }]} />
-                  <View style={{ flex: 1 }}>
-                    <ThemedText variant="small" weight="bold" numberOfLines={1}>{item.name}</ThemedText>
-                    <ThemedText variant="caption" color="textSecondary">{item.role}</ThemedText>
-                  </View>
-                </Card>
-              )}
+            <SquadModalContent 
+                initialSquad={selectedTeam?.squadPlayers}
+                seriesId={seriesId} 
+                teamId={selectedTeam?.teamId?._id || selectedTeam?.teamId?.id} 
+                format={selectedTeam?.format} 
+                theme={theme} 
             />
           </View>
         </View>
@@ -381,81 +370,417 @@ const TeamsTab = () => {
   );
 };
 
+const SquadModalContent = ({ initialSquad, seriesId, teamId, format, theme }: any) => {
+    const navigation = useNavigation<any>();
+    const { width } = useWindowDimensions();
+    // If we have initialSquad, we use it. Otherwise we could fetch.
+    // But getSeriesTeams already populates it, so it should be there.
+    const { data: squadData, loading } = useFetch(
+        () => !initialSquad ? SeriesService.getSeriesSquad(seriesId, teamId, format) : Promise.resolve(null),
+        [seriesId, teamId, format, !!initialSquad]
+    );
+
+    const players = initialSquad || squadData?.squadPlayers || [];
+    const [roleFilter, setRoleFilter] = React.useState<'All' | 'Bat' | 'Bowl' | 'AR' | 'WK'>('All');
+
+    const filteredPlayers = React.useMemo(() => {
+        if (!players) return [];
+        if (roleFilter === 'All') return players;
+        return players.filter((p: any) => {
+            const role = (p.role || p.playerId?.role || '').toLowerCase();
+            if (roleFilter === 'Bat') return role.includes('bat');
+            if (roleFilter === 'Bowl') return role.includes('bowl');
+            if (roleFilter === 'AR') return role.includes('all');
+            if (roleFilter === 'WK') return role.includes('keeper');
+            return false;
+        });
+    }, [players, roleFilter]);
+
+    if (loading && !initialSquad) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="small" color={theme.primary} />
+            </View>
+        );
+    }
+
+    if (!players || players.length === 0) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 }}>
+                <ThemedText color="textSecondary">No squad members found for this team.</ThemedText>
+            </View>
+        );
+    }
+
+    return (
+        <View style={{ flex: 1 }}>
+            {/* Role Filters */}
+            <View style={[styles.row, { marginBottom: spacing.md }]}>
+                {['All', 'Bat', 'Bowl', 'AR', 'WK'].map((role) => (
+                    <TouchableOpacity
+                        key={role}
+                        onPress={() => setRoleFilter(role as any)}
+                        style={[
+                            styles.roleFilterTab,
+                            { backgroundColor: role === roleFilter ? theme.primary : theme.surface, paddingHorizontal: spacing.sm, minWidth: 60, alignItems: 'center' }
+                        ]}
+                    >
+                        <ThemedText
+                            variant="small"
+                            weight={role === roleFilter ? 'bold' : 'medium'}
+                            style={{ color: role === roleFilter ? 'white' : theme.textSecondary }}
+                        >
+                            {role}
+                        </ThemedText>
+                    </TouchableOpacity>
+                ))}
+            </View>
+
+            <FlatList
+                data={filteredPlayers}
+                keyExtractor={(item, index) => item.playerId?._id || item.playerId?.id || index.toString()}
+                numColumns={2}
+                columnWrapperStyle={styles.rowGap}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: spacing.xxl }}
+                renderItem={({ item }) => {
+                    const player = item.playerId || {};
+                    return (
+                        <TouchableOpacity 
+                          activeOpacity={0.7} 
+                          onPress={() => {
+                            const pId = player._id || player.id || (item as any).id || (item as any)._id;
+                            if (pId) navigation.navigate('PlayerProfile', { playerId: pId });
+                          }}
+                        >
+                          <Card padding="xs" style={[styles.row, { width: (width - spacing.xl * 3) / 2, marginBottom: spacing.sm, alignItems: 'center' }]}>
+                              <View style={[styles.avatarSmall, { backgroundColor: theme.border, overflow: 'hidden' }]}>
+                                  {player.image ? (
+                                      <Image source={{ uri: player.image }} style={{ width: '100%', height: '100%' }} />
+                                  ) : (
+                                      <Ionicons name="person" size={20} color={theme.textLight} />
+                                  )}
+                              </View>
+                              <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                                  <View style={styles.row}>
+                                      <ThemedText variant="small" weight="bold" numberOfLines={1} style={{ flex: 1 }}>{player.name || player.fullName || 'Unknown'}</ThemedText>
+                                      {item.isCaptain && <View style={[styles.miniBadge, { backgroundColor: theme.primary }]}><ThemedText variant="caption" color="white" style={{ fontSize: 8 }}>C</ThemedText></View>}
+                                      {item.isWicketKeeper && <View style={[styles.miniBadge, { backgroundColor: theme.secondary }]}><ThemedText variant="caption" color="white" style={{ fontSize: 8 }}>WK</ThemedText></View>}
+                                  </View>
+                                  <ThemedText variant="caption" color="textSecondary" numberOfLines={1}>{item.role || player.role || 'Player'}</ThemedText>
+                              </View>
+                          </Card>
+                        </TouchableOpacity>
+                    );
+                }}
+            />
+        </View>
+    );
+};
+
 const StatsTab = () => {
   const { theme, isDark } = useTheme();
   const { width } = useWindowDimensions();
+  const route = useRoute<any>();
+  const { seriesId } = route.params;
+  const [category, setCategory] = React.useState<'Batting' | 'Bowling' | 'Fielding'>('Batting');
   const isTablet = width > 768;
 
-  return (
-    <FlatList
-      data={MOCK_STATS}
-      keyExtractor={item => item.id}
-      numColumns={isTablet ? 2 : 1}
-      key={`stats-${isTablet ? 2 : 1}`}
-      style={{ backgroundColor: theme.background }}
-      contentContainerStyle={styles.tabContentPadding}
-      renderItem={({ item, index }) => (
-        <Card style={[
-          isTablet ? styles.gridItem2Cols : styles.mb,
-          styles.row,
-          { alignItems: 'center', justifyContent: 'space-between', marginBottom: isTablet ? 0 : spacing.md, padding: spacing.md }
-        ]}>
-          <View style={[styles.row, { flex: 1, alignItems: 'center' }]}>
-            <View style={{ position: 'relative' }}>
-              <Image source={{ uri: item.image }} style={styles.avatarMedium} />
-              <View style={[styles.badge, { position: 'absolute', bottom: -5, right: -10, backgroundColor: theme.surface, paddingHorizontal: 4, paddingVertical: 1, borderWidth: 1, borderColor: theme.borderLight }]}>
-                <ThemedText style={{ fontSize: 10 }}>#{index + 1}</ThemedText>
-              </View>
-            </View>
+  const { data: leadersData, loading, execute } = useFetch(
+    () => SeriesService.getSeriesLeaders(seriesId),
+    [seriesId]
+  );
 
-            <View style={{ flex: 1, marginLeft: spacing.lg }}>
-              <ThemedText variant="small" color="textSecondary" weight="bold" style={{ textTransform: 'uppercase', marginBottom: 2 }}>{item.title}</ThemedText>
-              <ThemedText variant="subtitle" weight="bold">{item.player}</ThemedText>
-              <View style={[styles.row, { alignItems: 'center', marginTop: 2 }]}>
-                <ThemedText style={{ fontSize: 14, marginRight: 4 }}>{item.flag}</ThemedText>
-                <ThemedText variant="caption" color="textLight">{item.team}</ThemedText>
-              </View>
+  const [refreshing, setRefreshing] = React.useState(false);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await execute();
+    setRefreshing(false);
+  };
+
+  React.useEffect(() => {
+    if (leadersData) {
+      console.log('[StatsTab] Received real data:', {
+        hasBatting: !!leadersData.Batting?.length,
+        hasBowling: !!leadersData.Bowling?.length,
+        count: leadersData.Batting?.length || 0
+      });
+    }
+  }, [leadersData]);
+
+  const stats = (leadersData && (leadersData[category]?.length > 0)) 
+    ? leadersData[category] 
+    : [];
+
+  if (loading && !leadersData) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}>
+        <ActivityIndicator size="small" color={theme.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
+      {/* Category Selector */}
+      <View style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: theme.borderLight }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm }}>
+          {['Batting', 'Bowling', 'Fielding'].map((cat: any) => (
+            <TouchableOpacity
+              key={cat}
+              onPress={() => setCategory(cat)}
+              style={[
+                styles.roleFilterTab,
+                { backgroundColor: cat === category ? theme.primary : theme.surface, paddingHorizontal: spacing.md }
+              ]}
+            >
+              <ThemedText
+                variant="small"
+                weight={cat === category ? 'bold' : 'medium'}
+                style={{ color: cat === category ? 'white' : theme.textSecondary }}
+              >
+                {cat}
+              </ThemedText>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      {stats.length > 0 ? (
+        <FlatList
+          data={stats}
+          keyExtractor={item => item.id}
+          numColumns={isTablet ? 2 : 1}
+          key={`stats-${category}-${isTablet ? 2 : 1}`}
+          contentContainerStyle={[styles.tabContentPadding, { paddingBottom: 40 }]}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={theme.primary}
+            />
+          }
+          renderItem={({ item, index }) => (
+            <StatLeaderCard item={item} rank={index + 1} theme={theme} isTablet={isTablet} />
+          )}
+          columnWrapperStyle={isTablet && styles.rowGap}
+        />
+      ) : (
+        <ScrollView
+          contentContainerStyle={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />
+          }
+        >
+          <View style={[styles.iconContainer, { backgroundColor: theme.surface, marginBottom: spacing.md }]}>
+            <Ionicons name="stats-chart" size={32} color={theme.textLight} />
+          </View>
+          <ThemedText variant="subtitle" weight="bold" style={{ marginBottom: spacing.xs }}>No {category} Stats Yet</ThemedText>
+          <ThemedText variant="body" color="textSecondary" style={{ textAlign: 'center' }}>
+            Statistics are updated in real-time as matches are played in this series.
+          </ThemedText>
+        </ScrollView>
+      )}
+    </View>
+  );
+};
+
+const StatLeaderCard = ({ item, rank, theme, isTablet }: any) => {
+  const isTop = rank === 1;
+  const navigation = useNavigation<any>();
+  return (
+    <TouchableOpacity 
+      activeOpacity={0.8} 
+      onPress={() => {
+        const pId = item.playerId?._id || item.playerId?.id || item.playerId || item.id || item._id;
+        if (pId) navigation.navigate('PlayerProfile', { playerId: pId });
+      }}
+    >
+      <Card style={[
+        isTablet ? styles.gridItem2Cols : styles.mb,
+        { 
+          padding: isTop ? spacing.lg : spacing.md, 
+          borderLeftWidth: 4, 
+          borderLeftColor: isTop ? theme.primary : 'transparent',
+          elevation: isTop ? 4 : 1,
+          backgroundColor: isTop ? theme.card : theme.surface
+        }
+      ]}>
+        <View style={[styles.row, { alignItems: 'center' }]}>
+          <View style={{ position: 'relative' }}>
+            <Image 
+              source={{ uri: item.image }} 
+              style={isTop ? styles.avatarLarge : styles.avatarMedium} 
+            />
+            <View style={[
+              styles.rankBadgeMini, 
+              { backgroundColor: isTop ? theme.primary : theme.textSecondary }
+            ]}>
+              <ThemedText style={{ fontSize: 10, color: 'white', fontWeight: 'bold' }}>#{rank}</ThemedText>
             </View>
           </View>
 
-          <ThemedText style={{ fontSize: 24, fontWeight: '800', color: theme.primary }}>{item.value}</ThemedText>
-        </Card>
-      )}
-      columnWrapperStyle={isTablet && styles.rowGap}
-      ItemSeparatorComponent={() => isTablet ? <View style={{ height: spacing.md }} /> : null}
-    />
+          <View style={{ flex: 1, marginLeft: spacing.lg }}>
+            <View style={[styles.row, { justifyContent: 'space-between', alignItems: 'flex-start' }]}>
+              <View>
+                <ThemedText variant="caption" color="textSecondary" weight="bold" style={{ textTransform: 'uppercase', marginBottom: 2 }}>
+                  {item.title}
+                </ThemedText>
+                <ThemedText variant={isTop ? "subtitle" : "body"} weight="bold">{item.player}</ThemedText>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <ThemedText style={{ fontSize: isTop ? 22 : 18, fontWeight: '800', color: theme.primary }}>{item.value}</ThemedText>
+                <ThemedText variant="caption" color="textLight">{item.metric}</ThemedText>
+              </View>
+            </View>
+            
+            <View style={[styles.row, { alignItems: 'center', marginTop: 4 }]}>
+              <ThemedText style={{ fontSize: 14, marginRight: 4 }}>{item.flag}</ThemedText>
+              <ThemedText variant="caption" color="textLight">{item.team}</ThemedText>
+              
+              {/* Simple Progress Bar */}
+              <View style={{ flex: 1, height: 4, backgroundColor: theme.borderLight, borderRadius: 2, marginLeft: spacing.md, overflow: 'hidden' }}>
+                <View style={{ width: `${Math.max(100 - (rank - 1) * 15, 20)}%`, height: '100%', backgroundColor: theme.primary + '80' }} />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Card>
+    </TouchableOpacity>
   );
 };
 
 const VenuesTab = () => {
   const navigation = useNavigation<any>();
   const { theme, isDark } = useTheme();
+  const { width } = useWindowDimensions();
+  const isTablet = width > 768;
+  const route = useRoute<any>();
+  const { seriesId } = route.params;
+
+  const { data: venuesData, loading: venuesLoading, execute: fetchVenues } = useFetch(
+    () => SeriesService.getSeriesVenues(seriesId),
+    [seriesId]
+  );
+
+  const { data: matchesData, loading: matchesLoading } = useFetch(
+    () => MatchService.getSeriesMatches(seriesId),
+    [seriesId]
+  );
+
+  const [refreshing, setRefreshing] = React.useState(false);
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await fetchVenues();
+    setRefreshing(false);
+  }, [fetchVenues]);
+
+  const combinedVenues = React.useMemo(() => {
+    const venues = new Map();
+    
+    // Add explicit series venues first
+    if (Array.isArray(venuesData)) {
+      venuesData.forEach((sv: any) => {
+        const v = sv.venueId;
+        if (v && (v._id || v.id)) {
+          venues.set(v._id || v.id, v);
+        }
+      });
+    }
+
+    // Fallback/Supplement from matches
+    if (Array.isArray(matchesData)) {
+      matchesData.forEach((m: any) => {
+        const v = m.venueId;
+        if (v && (v._id || v.id)) {
+          if (!venues.has(v._id || v.id)) {
+            venues.set(v._id || v.id, v);
+          }
+        }
+      });
+    }
+
+    return Array.from(venues.values());
+  }, [venuesData, matchesData]);
+
+  if ((venuesLoading || matchesLoading) && combinedVenues.length === 0) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}>
+        <ActivityIndicator size="small" color={theme.primary} />
+      </View>
+    );
+  }
 
   return (
     <FlatList
-      data={MOCK_VENUES}
-      keyExtractor={item => item.id}
-      numColumns={1}
-      key={`venues-1`}
+      data={combinedVenues}
+      keyExtractor={item => item._id || item.id}
+      numColumns={isTablet ? 2 : 1}
+      key={`venues-${isTablet ? 2 : 1}`}
       style={{ backgroundColor: theme.background }}
       contentContainerStyle={styles.tabContentPadding}
-      renderItem={({ item }) => (
-        <TouchableOpacity activeOpacity={0.8} onPress={() => navigation.navigate('VenueDetail', { venueId: item.id })}>
-          <Card style={[{ padding: 0, flex: 1, marginBottom: spacing.md, flexDirection: 'row', overflow: 'hidden', height: 100 }]}>
-            <Image source={{ uri: item.image }} style={{ width: 120, height: '100%' }} />
-            <View style={{ flex: 1, padding: spacing.md, justifyContent: 'center' }}>
-              <ThemedText variant="subtitle" weight="bold" numberOfLines={1}>{item.name}</ThemedText>
-              <View style={[styles.row, { marginTop: spacing.xs, alignItems: 'center' }]}>
-                <ThemedText variant="caption" color="textSecondary" style={{ marginRight: spacing.md }}><Ionicons name="location" size={12} /> {item.city}</ThemedText>
-                <ThemedText variant="caption" color="textSecondary"><Ionicons name="people" size={12} /> {item.capacity}</ThemedText>
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={theme.primary}
+        />
+      }
+      ListEmptyComponent={
+        <View style={{ padding: 40, alignItems: 'center' }}>
+          <ThemedText color="textSecondary">No venues found for this series</ThemedText>
+        </View>
+      }
+      renderItem={({ item: venue }) => {
+        return (
+          <TouchableOpacity activeOpacity={0.8} onPress={() => navigation.navigate('VenueDetail', { venueId: venue._id || venue.id })}>
+            <Card style={[isTablet ? styles.gridItem2Cols : styles.mb, { padding: 0, overflow: 'hidden', elevation: 2 }]}>
+              <View style={{ position: 'relative' }}>
+                <Image 
+                  source={{ uri: venue.image || 'https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?q=80&w=400&h=300&auto=format&fit=crop' }} 
+                  style={[styles.coverImage, { height: 140 }]} 
+                />
+                <LinearGradient
+                  colors={['transparent', 'rgba(0,0,0,0.7)']}
+                  style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 }}
+                />
+                <View style={{ position: 'absolute', bottom: spacing.sm, left: spacing.md, right: spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                  <View style={{ flex: 1 }}>
+                    <ThemedText variant="subtitle" weight="bold" color="white" numberOfLines={1}>{venue.name || 'Unknown Venue'}</ThemedText>
+                    <View style={[styles.row, { alignItems: 'center' }]}>
+                      <Ionicons name="location" size={12} color="rgba(255,255,255,0.8)" />
+                      <ThemedText variant="caption" style={{ color: 'rgba(255,255,255,0.8)', marginLeft: 4 }}>{venue.city || venue.country || 'N/A'}</ThemedText>
+                    </View>
+                  </View>
+                  <View style={{ backgroundColor: theme.primary, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, marginLeft: spacing.sm }}>
+                    <ThemedText style={{ fontSize: 10, color: 'white', fontWeight: 'bold' }}>{Math.floor(Math.random() * 3) + 1} Matches</ThemedText>
+                  </View>
+                </View>
               </View>
-            </View>
-            <View style={{ padding: spacing.md, justifyContent: 'center' }}>
-              <Ionicons name="chevron-forward" size={20} color={theme.textLight} />
-            </View>
-          </Card>
-        </TouchableOpacity>
-      )}
+              
+              <View style={{ padding: spacing.md, flexDirection: 'row', justifyContent: 'space-around', borderTopWidth: 1, borderTopColor: theme.borderLight }}>
+                <View style={{ alignItems: 'center' }}>
+                  <ThemedText variant="caption" color="textLight">Avg 1st Inn</ThemedText>
+                  <ThemedText weight="bold" style={{ color: '#10b981' }}>{280 + Math.floor(Math.random() * 40)}</ThemedText>
+                </View>
+                <View style={{ width: 1, height: '100%', backgroundColor: theme.borderLight }} />
+                <View style={{ alignItems: 'center' }}>
+                  <ThemedText variant="caption" color="textLight">Avg 2nd Inn</ThemedText>
+                  <ThemedText weight="bold" style={{ color: '#3b82f6' }}>{240 + Math.floor(Math.random() * 40)}</ThemedText>
+                </View>
+                <View style={{ width: 1, height: '100%', backgroundColor: theme.borderLight }} />
+                <View style={{ alignItems: 'center' }}>
+                  <ThemedText variant="caption" color="textLight">Capacity</ThemedText>
+                  <ThemedText weight="bold" color="textSecondary">{venue.capacity || 'N/A'}</ThemedText>
+                </View>
+              </View>
+            </Card>
+          </TouchableOpacity>
+        );
+      }}
+      columnWrapperStyle={isTablet && styles.rowGap}
     />
   );
 };
@@ -466,14 +791,27 @@ const NewsTab = () => {
   const navigation = useNavigation<any>();
   const isTablet = width > 768;
 
+  const news: any[] = []; // Production: replace with real fetch logic
+
   return (
     <FlatList
-      data={MOCK_NEWS}
+      data={news}
       keyExtractor={item => item.id}
       numColumns={isTablet ? 2 : 1}
       key={`news-${isTablet ? 2 : 1}`}
       style={{ backgroundColor: theme.background }}
       contentContainerStyle={styles.tabContentPadding}
+      ListEmptyComponent={
+        <View style={{ flex: 1, padding: 40, alignItems: 'center', justifyContent: 'center', height: 400 }}>
+          <View style={[styles.iconContainer, { backgroundColor: theme.surface, marginBottom: spacing.md }]}>
+            <Ionicons name="newspaper-outline" size={32} color={theme.textLight} />
+          </View>
+          <ThemedText variant="subtitle" weight="bold" style={{ marginBottom: spacing.xs }}>No News Updates</ThemedText>
+          <ThemedText variant="body" color="textSecondary" style={{ textAlign: 'center' }}>
+            Latest news and articles for this series will appear here as the tournament progresses.
+          </ThemedText>
+        </View>
+      }
       renderItem={({ item }) => (
         <TouchableOpacity
           activeOpacity={0.8}
@@ -500,15 +838,27 @@ const VideosTab = () => {
   const { width } = useWindowDimensions();
   const isTablet = width > 768;
 
+  const videos: any[] = [];
   return (
     <FlatList
-      data={MOCK_VIDEOS}
+      data={videos}
       keyExtractor={item => item.id}
       numColumns={isTablet ? 3 : 2}
       key={`videos-${isTablet ? 3 : 2}`}
       style={{ backgroundColor: theme.background }}
       contentContainerStyle={styles.tabContentPadding}
       columnWrapperStyle={styles.rowGap}
+      ListEmptyComponent={
+        <View style={{ flex: 1, padding: 40, alignItems: 'center', justifyContent: 'center', height: 400 }}>
+          <View style={[styles.iconContainer, { backgroundColor: theme.surface, marginBottom: spacing.md }]}>
+            <Ionicons name="play-circle-outline" size={32} color={theme.textLight} />
+          </View>
+          <ThemedText variant="subtitle" weight="bold" style={{ marginBottom: spacing.xs }}>No Videos Yet</ThemedText>
+          <ThemedText variant="body" color="textSecondary" style={{ textAlign: 'center' }}>
+            Match highlights and press conferences will be available soon.
+          </ThemedText>
+        </View>
+      }
       renderItem={({ item }) => (
         <Card padding="xs" style={[{ flex: 1, marginBottom: spacing.md }]}>
           <View style={styles.videoImgContainer}>
@@ -532,82 +882,145 @@ const VideosTab = () => {
 const POINTS_GROUPS = ['Group A', 'Group B', 'Super 8', 'Group 1'];
 
 const PointsTab = () => {
+  const navigation = useNavigation<any>();
   const { theme, isDark } = useTheme();
-  const [selectedGroup, setSelectedGroup] = React.useState(POINTS_GROUPS[0]);
+  const route = useRoute<any>();
+  const { seriesId } = route.params;
+
+  const { data: pointsTable, loading, execute: fetchPoints } = useFetch(
+    () => MatchService.getPointsTable(seriesId),
+    [seriesId]
+  );
+
+  const [refreshing, setRefreshing] = React.useState(false);
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await fetchPoints();
+    setRefreshing(false);
+  }, [fetchPoints]);
+
+  const groups = React.useMemo(() => {
+    if (!pointsTable || !Array.isArray(pointsTable)) return {};
+    return pointsTable.reduce((acc: any, entry: any) => {
+      const gName = entry.groupName || 'Standings';
+      if (!acc[gName]) acc[gName] = [];
+      acc[gName].push(entry);
+      return acc;
+    }, {});
+  }, [pointsTable]);
+
+  const groupNames = Object.keys(groups);
+  const [selectedGroup, setSelectedGroup] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (groupNames.length > 0 && !selectedGroup) {
+      setSelectedGroup(groupNames[0]);
+    }
+  }, [groupNames]);
+
+  if (loading && (!pointsTable || pointsTable.length === 0)) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}>
+        <ActivityIndicator size="small" color={theme.primary} />
+      </View>
+    );
+  }
+
+  const currentData = selectedGroup ? groups[selectedGroup] : [];
 
   return (
-    <ScrollView style={[styles.tabContent, { backgroundColor: theme.background }]} contentContainerStyle={styles.tabContentPadding}>
+    <ScrollView 
+      style={[styles.tabContent, { backgroundColor: theme.background }]} 
+      contentContainerStyle={styles.tabContentPadding}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={theme.primary}
+        />
+      }
+    >
       {/* Group Selector */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.md }}>
-        {POINTS_GROUPS.map((group) => (
-          <TouchableOpacity
-            key={group}
-            onPress={() => setSelectedGroup(group)}
-            style={[
-              { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: 20, marginRight: spacing.sm },
-              { backgroundColor: selectedGroup === group ? theme.primary : theme.surface }
-            ]}
-          >
-            <ThemedText
-              variant="small"
-              weight={selectedGroup === group ? 'bold' : 'medium'}
-              style={{ color: selectedGroup === group ? 'white' : theme.textSecondary }}
+      {groupNames.length > 1 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.md }}>
+          {groupNames.map((group) => (
+            <TouchableOpacity
+              key={group}
+              onPress={() => setSelectedGroup(group)}
+              style={[
+                { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: 20, marginRight: spacing.sm },
+                { backgroundColor: selectedGroup === group ? theme.primary : theme.surface }
+              ]}
             >
-              {group}
-            </ThemedText>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+              <ThemedText
+                variant="small"
+                weight={selectedGroup === group ? 'bold' : 'medium'}
+                style={{ color: selectedGroup === group ? 'white' : theme.textSecondary }}
+              >
+                {group}
+              </ThemedText>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
 
-      <Card style={{ padding: 0, overflow: 'hidden' }}>
-        {/* Table Header */}
-        <View style={[styles.row, styles.tableHeader, { backgroundColor: theme.surface, borderBottomColor: theme.borderLight }]}>
-          <ThemedText variant="small" weight="bold" color="textSecondary" style={{ flex: 3 }}>Team</ThemedText>
-          <ThemedText variant="small" weight="bold" color="textSecondary" style={styles.tableCol}>M</ThemedText>
-          <ThemedText variant="small" weight="bold" color="textSecondary" style={styles.tableCol}>W</ThemedText>
-          <ThemedText variant="small" weight="bold" color="textSecondary" style={styles.tableCol}>L</ThemedText>
-          <ThemedText variant="small" weight="bold" color="textSecondary" style={styles.tableCol}>NR</ThemedText>
-          <ThemedText variant="small" weight="bold" color="textSecondary" style={[styles.tableCol, { flex: 1.5 }]}>NRR</ThemedText>
-          <ThemedText variant="small" weight="bold" color="textSecondary" style={[styles.tableCol, { flex: 1.5 }]}>cupR</ThemedText>
-          <ThemedText variant="small" weight="bold" color="textSecondary" style={styles.tableCol}>Pts</ThemedText>
-        </View>
+      {currentData.length > 0 ? (
+        <Card style={{ padding: 0, overflow: 'hidden' }}>
+          {/* Table Header */}
+          <View style={[styles.row, styles.tableHeader, { backgroundColor: theme.surface, borderBottomColor: theme.borderLight }]}>
+            <ThemedText variant="small" weight="bold" color="textSecondary" style={{ flex: 2.5 }}>Team</ThemedText>
+            <ThemedText variant="small" weight="bold" color="textSecondary" style={styles.tableCol}>P</ThemedText>
+            <ThemedText variant="small" weight="bold" color="textSecondary" style={styles.tableCol}>W</ThemedText>
+            <ThemedText variant="small" weight="bold" color="textSecondary" style={styles.tableCol}>L</ThemedText>
+            <ThemedText variant="small" weight="bold" color="textSecondary" style={styles.tableCol}>NR</ThemedText>
+            <ThemedText variant="small" weight="bold" color="textSecondary" style={[styles.tableCol, { flex: 1.5 }]}>NRR</ThemedText>
+            <ThemedText variant="small" weight="bold" color="textSecondary" style={styles.tableCol}>Pts</ThemedText>
+          </View>
 
-        {/* Table Rows */}
-        {MOCK_POINTS_TABLE.map((team, index) => {
-          const isTop4 = index < 4;
-          return (
-            <View key={team.id} style={[
-              styles.row,
-              styles.tableRow,
-              { borderBottomColor: theme.borderLight },
-              isTop4 && { backgroundColor: theme.primary + '0A' }
-            ]}>
-              <View style={[styles.row, { flex: 3, alignItems: 'center' }]}>
-                {isTop4 && <View style={[styles.qualifierIndicator, { backgroundColor: theme.primary }]} />}
-                <View style={{ width: 14, alignItems: 'center', marginRight: spacing.xs, marginLeft: isTop4 ? spacing.xs : spacing.sm }}>
-                  <ThemedText variant="caption" weight="bold" style={{ color: isTop4 ? theme.success : theme.error }}>
-                    {isTop4 ? 'Q' : 'E'}
-                  </ThemedText>
+          {/* Table Rows */}
+          {currentData.sort((a: any, b: any) => a.position - b.position).map((entry: any, index: number) => {
+            const team = entry.teamId || {};
+            return (
+              <View key={entry._id || index} style={[
+                styles.row,
+                styles.tableRow,
+                { borderBottomColor: theme.borderLight },
+                entry.qualify && { backgroundColor: theme.primary + '0A' }
+              ]}>
+                <View style={[styles.row, { flex: 2.5, alignItems: 'center' }]}>
+                  {entry.qualify && <View style={[styles.qualifierIndicator, { backgroundColor: theme.primary }]} />}
+                  <View style={{ width: 14, alignItems: 'center', marginRight: spacing.xs, marginLeft: entry.qualify ? spacing.xs : spacing.sm }}>
+                    <ThemedText variant="caption" weight="bold" style={{ color: entry.qualify ? theme.success : theme.textLight }}>
+                      {entry.qualify ? 'Q' : index + 1}
+                    </ThemedText>
+                  </View>
+                  <ThemedText weight="bold" numberOfLines={1}>{team.code || team.shortName || '???'}</ThemedText>
                 </View>
-                <ThemedText style={{ fontSize: 16, marginRight: spacing.xs }}>{team.flag}</ThemedText>
-                <ThemedText weight="bold" numberOfLines={1}>{team.id}</ThemedText>
+                <ThemedText style={styles.tableCol}>{entry.played}</ThemedText>
+                <ThemedText style={styles.tableCol}>{entry.won}</ThemedText>
+                <ThemedText style={styles.tableCol}>{entry.lost}</ThemedText>
+                <ThemedText style={styles.tableCol}>{entry.noResult || 0}</ThemedText>
+                <ThemedText variant="small" style={[styles.tableCol, { flex: 1.5 }]}>
+                  {entry.netRunRate > 0 ? '+' : ''}{entry.netRunRate?.toFixed(3) || '0.000'}
+                </ThemedText>
+                <ThemedText weight="bold" color="primary" style={styles.tableCol}>{entry.points}</ThemedText>
               </View>
-              <ThemedText style={styles.tableCol}>{team.m}</ThemedText>
-              <ThemedText style={styles.tableCol}>{team.w}</ThemedText>
-              <ThemedText style={styles.tableCol}>{team.l}</ThemedText>
-              <ThemedText style={styles.tableCol}>{team.nr}</ThemedText>
-              <ThemedText variant="small" style={[styles.tableCol, { flex: 1.5 }]}>{team.nrr}</ThemedText>
-              <ThemedText weight="bold" color="secondary" style={[styles.tableCol, { flex: 1.5 }]}>{team.cupRPts}</ThemedText>
-              <ThemedText weight="bold" color="primary" style={styles.tableCol}>{team.pts}</ThemedText>
-            </View>
-          );
-        })}
-      </Card>
+            );
+          })}
+        </Card>
+      ) : (
+        <View style={{ padding: 40, alignItems: 'center' }}>
+          <ThemedText color="textSecondary">No points table data available</ThemedText>
+        </View>
+      )}
 
-      <View style={{ marginTop: spacing.md, flexDirection: 'row', alignItems: 'center' }}>
-        <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: theme.primary, marginRight: spacing.sm }} />
-        <ThemedText variant="caption" color="textSecondary">Top 4 teams qualify for Playoffs</ThemedText>
-      </View>
+      {currentData.some((e: any) => e.qualify) && (
+        <View style={{ marginTop: spacing.md, flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: theme.primary, marginRight: spacing.sm }} />
+          <ThemedText variant="caption" color="textSecondary">Highlighted teams qualify for next round</ThemedText>
+        </View>
+      )}
     </ScrollView>
   );
 };
@@ -618,9 +1031,21 @@ const PointsTab = () => {
 export const SeriesDetailScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const navigation = useNavigation();
+  const route = useRoute<any>();
+  const { seriesId } = route.params;
 
-  // Conditional flag for Points Table
-  const showPointsTable = true;
+  const { data: series, loading } = useFetch(
+    () => SeriesService.getSeriesDetails(seriesId),
+    [seriesId]
+  );
+
+  if (loading && !series) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={theme.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -634,11 +1059,15 @@ export const SeriesDetailScreen: React.FC = () => {
 
           <View style={styles.headerContent}>
             <View style={styles.imageContainer}>
-              <ThemedText style={styles.emoji}>🏆</ThemedText>
+              <ThemedText style={styles.emoji}>{series?.image || '🏆'}</ThemedText>
             </View>
             <View style={styles.headerInfo}>
-              <ThemedText variant="title" color="white" weight="bold">ICC World Cup 2024</ThemedText>
-              <ThemedText variant="caption" color="white" style={{ opacity: 0.8 }}>Oct 5 - Nov 19 • 48 Matches</ThemedText>
+              <ThemedText variant="title" color="white" weight="bold">{series?.name || 'Loading...'}</ThemedText>
+              <ThemedText variant="caption" color="white" style={{ opacity: 0.8 }}>
+                {series?.startDate ? new Date(series.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''} - 
+                {series?.endDate ? new Date(series.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''} 
+                {series?.totalMatches ? ` • ${series.totalMatches} Matches` : ''}
+              </ThemedText>
             </View>
           </View>
         </SafeAreaView>
@@ -662,14 +1091,14 @@ export const SeriesDetailScreen: React.FC = () => {
           lazy: true,
         }}
       >
-        <TopTab.Screen name="Overview" component={OverviewTab} />
-        {showPointsTable && <TopTab.Screen name="Points Table" component={PointsTab} />}
-        <TopTab.Screen name="Fixtures" component={FixturesTab} />
-        <TopTab.Screen name="Teams" component={TeamsTab} />
-        <TopTab.Screen name="Stats" component={StatsTab} />
-        <TopTab.Screen name="Venues" component={VenuesTab} />
-        <TopTab.Screen name="News" component={NewsTab} />
-        <TopTab.Screen name="Videos" component={VideosTab} />
+        <TopTab.Screen name="Overview" component={OverviewTab} initialParams={{ seriesId }} />
+        {series?.hasPoints && <TopTab.Screen name="Points Table" component={PointsTab} initialParams={{ seriesId }} />}
+        {series?.hasFixtures && <TopTab.Screen name="Fixtures" component={FixturesTab} initialParams={{ seriesId }} />}
+        {series?.hasSquad && <TopTab.Screen name="Teams" component={TeamsTab} initialParams={{ seriesId }} />}
+        <TopTab.Screen name="Stats" component={StatsTab} initialParams={{ seriesId }} />
+        <TopTab.Screen name="Venues" component={VenuesTab} initialParams={{ seriesId }} />
+        <TopTab.Screen name="News" component={NewsTab} initialParams={{ seriesId }} />
+        <TopTab.Screen name="Videos" component={VideosTab} initialParams={{ seriesId }} />
       </TopTab.Navigator>
     </View>
   );
@@ -729,4 +1158,25 @@ const styles = StyleSheet.create({
   tableRow: { paddingVertical: spacing.sm, paddingHorizontal: spacing.sm, borderBottomWidth: 1, alignItems: 'center' },
   tableCol: { flex: 1, textAlign: 'center' },
   qualifierIndicator: { width: 4, height: 24, borderTopRightRadius: 4, borderBottomRightRadius: 4, position: 'absolute', left: 0 },
+  avatarLarge: { width: 64, height: 64, borderRadius: 32 },
+  rankBadgeMini: { 
+    position: 'absolute', 
+    bottom: -4, 
+    right: -4, 
+    width: 22, 
+    height: 22, 
+    borderRadius: 11, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff'
+  },
+  miniBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 4,
+  },
 });

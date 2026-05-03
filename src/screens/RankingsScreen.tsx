@@ -13,6 +13,7 @@ type Format = 'odi' | 'test' | 't20';
 type Category = 'batters' | 'bowlers' | 'allrounders' | 'teams';
 
 interface RankingData {
+    id?: string;
     rank: number;
     name: string;
     team: string;
@@ -20,8 +21,8 @@ interface RankingData {
 }
 
 const mockBatters: RankingData[] = [
-    { rank: 1, name: 'Virat Kohli', team: 'IND', rating: 890 },
-    { rank: 2, name: 'Babar Azam', team: 'PAK', rating: 865 },
+    { id: 'p1', rank: 1, name: 'Virat Kohli', team: 'IND', rating: 890 },
+    { id: 'p4', rank: 2, name: 'Babar Azam', team: 'PAK', rating: 865 },
     { rank: 3, name: 'Steve Smith', team: 'AUS', rating: 850 },
     { rank: 4, name: 'Kane Williamson', team: 'NZ', rating: 835 },
     { rank: 5, name: 'Joe Root', team: 'ENG', rating: 820 },
@@ -31,8 +32,8 @@ const mockBatters: RankingData[] = [
 ];
 
 const mockBowlers: RankingData[] = [
-    { rank: 1, name: 'Jasprit Bumrah', team: 'IND', rating: 895 },
-    { rank: 2, name: 'Pat Cummins', team: 'AUS', rating: 870 },
+    { id: 'p6', rank: 1, name: 'Jasprit Bumrah', team: 'IND', rating: 895 },
+    { id: 'p2', rank: 2, name: 'Pat Cummins', team: 'AUS', rating: 870 },
     { rank: 3, name: 'Trent Boult', team: 'NZ', rating: 855 },
     { rank: 4, name: 'Kagiso Rabada', team: 'SA', rating: 840 },
     { rank: 5, name: 'Mitchell Starc', team: 'AUS', rating: 825 },
@@ -40,7 +41,7 @@ const mockBowlers: RankingData[] = [
 
 const mockAllRounders: RankingData[] = [
     { rank: 1, name: 'Shakib Al Hasan', team: 'BAN', rating: 880 },
-    { rank: 2, name: 'Ben Stokes', team: 'ENG', rating: 865 },
+    { id: 'p3', rank: 2, name: 'Ben Stokes', team: 'ENG', rating: 865 },
     { rank: 3, name: 'Ravindra Jadeja', team: 'IND', rating: 850 },
 ];
 
@@ -68,28 +69,37 @@ export const RankingsScreen: React.FC = () => {
     };
 
     const renderRankingItem = ({ item }: { item: RankingData }) => (
-        <Card style={styles.rankingCard}>
-            <View style={styles.rankingContent}>
-                <View style={styles.rankInfo}>
-                    <View style={[styles.rankBadge, { backgroundColor: theme.primary + '15' }]}>
-                        <ThemedText style={[styles.rankNumber, { color: theme.primary }]}>#{item.rank}</ThemedText>
-                    </View>
-                    <View style={styles.playerInfo}>
-                        <ThemedText variant="body" weight="semibold">{item.name}</ThemedText>
-                        <View style={styles.teamBadge}>
-                            <Ionicons name="flag-outline" size={12} color={theme.textSecondary} />
-                            <ThemedText variant="small" color="textSecondary">{item.team}</ThemedText>
+        <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+                if (category !== 'teams') {
+                    (navigation as any).navigate('PlayerProfile', { playerId: item.id || item.name });
+                }
+            }}
+        >
+            <Card style={styles.rankingCard}>
+                <View style={styles.rankingContent}>
+                    <View style={styles.rankInfo}>
+                        <View style={[styles.rankBadge, { backgroundColor: theme.primary + '15' }]}>
+                            <ThemedText style={[styles.rankNumber, { color: theme.primary }]}>#{item.rank}</ThemedText>
+                        </View>
+                        <View style={styles.playerInfo}>
+                            <ThemedText variant="body" weight="semibold">{item.name}</ThemedText>
+                            <View style={styles.teamBadge}>
+                                <Ionicons name="flag-outline" size={12} color={theme.textSecondary} />
+                                <ThemedText variant="small" color="textSecondary">{item.team}</ThemedText>
+                            </View>
                         </View>
                     </View>
+                    <View style={styles.ratingInfo}>
+                        <ThemedText variant="title" weight="bold" style={{ color: theme.primary }}>
+                            {item.rating}
+                        </ThemedText>
+                        <ThemedText variant="small" color="textSecondary">Rating</ThemedText>
+                    </View>
                 </View>
-                <View style={styles.ratingInfo}>
-                    <ThemedText variant="title" weight="bold" style={{ color: theme.primary }}>
-                        {item.rating}
-                    </ThemedText>
-                    <ThemedText variant="small" color="textSecondary">Rating</ThemedText>
-                </View>
-            </View>
-        </Card>
+            </Card>
+        </TouchableOpacity>
     );
 
     return (

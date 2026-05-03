@@ -12,6 +12,7 @@ interface ThemeContextType {
   setLanguage: (language: string) => void;
   isOnboardingCompleted: boolean;
   completeOnboarding: () => void;
+  isSettingsLoaded: boolean;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -24,6 +25,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [isDark, setIsDark] = useState(false);
   const [language, setLanguageState] = useState('English');
   const [isOnboardingCompleted, setIsOnboardingCompleted] = useState(false);
+  const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -59,6 +61,8 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       }
     } catch (error) {
       console.error('Error loading settings:', error);
+    } finally {
+      setIsSettingsLoaded(true);
     }
   };
 
@@ -114,7 +118,8 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       language, 
       setLanguage, 
       isOnboardingCompleted, 
-      completeOnboarding 
+      completeOnboarding,
+      isSettingsLoaded
     }}>
       {children}
     </ThemeContext.Provider>

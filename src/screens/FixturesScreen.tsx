@@ -16,9 +16,11 @@ import { useTheme } from '../theme/ThemeContext';
 import { Text as ThemedText } from '../components/ui/Text';
 import { Card } from '../components/ui/Card';
 import { spacing, borderRadius } from '../theme';
+import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MatchService } from '../services/match.service';
-import { useFetch } from '../hooks/useFetch';
+import { usePagination } from '../hooks/usePagination';
+import { ActivityIndicator } from 'react-native';
 
 const getLocalYMD = (d: Date) => {
   const year = d.getFullYear();
@@ -127,20 +129,23 @@ export const FixturesScreen: React.FC = () => {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
   };
 
-  const { data: fetchedMatches, loading, execute: fetchMatches } = useFetch(() => 
-    MatchService.getMatches({ status: 'scheduled', limit: 50 }),
+  const { 
+    items: fetchedMatches, 
+    loading, 
+    loadingMore, 
+    refreshing, 
+    loadMore, 
+    refresh 
+  } = usePagination<Match>(
+    (params) => MatchService.getMatches({ ...params, status: 'scheduled', limit: 50 }),
     []
   );
 
-  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = React.useCallback(() => {
+    refresh();
+  }, [refresh]);
 
-  const onRefresh = React.useCallback(async () => {
-    setRefreshing(true);
-    await fetchMatches();
-    setRefreshing(false);
-  }, [fetchMatches]);
-
-  const sections = useMemo(() => {
+  const sections = useMemo<MatchSection[]>(() => {
     const dataSource = fetchedMatches || rawMatches;
     
     // Normalize format match format
@@ -148,7 +153,7 @@ export const FixturesScreen: React.FC = () => {
         ? dataSource 
         : dataSource.filter((m: any) => m.matchType === selectedFormat || m.format === selectedFormat);
         
-    const grouped = filtered.reduce((acc: any, m: any) => {
+    const grouped = filtered.reduce((acc: Record<string, Match[]>, m: any) => {
       // Use matchDate from API, or date from mock
       const dateKey = m.matchDate ? getLocalYMD(new Date(m.matchDate)) : m.date; 
       acc[dateKey] = [...(acc[dateKey] || []), m];
@@ -242,6 +247,8 @@ export const FixturesScreen: React.FC = () => {
     return days;
   };
 
+  const navigation = useNavigation<any>();
+
   const renderMatch = ({ item }: { item: any }) => {
     
     const team1Name = item.teamAId?.shortName || item.teamAId?.name || item.teamA?.shortName || item.teamA?.code || item.team1?.code || 'T1';
@@ -250,9 +257,17 @@ export const FixturesScreen: React.FC = () => {
     const matchFormat = item.matchType || item.format || 'Format';
     const venueName = item.venueId?.name || item.venue?.name || item.venue || 'Venue TBD';
     const timeStr = item.matchTime ? new Date(item.matchTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : item.time || '';
+    const matchId = item._id || item.id;
     
     return (
-      <TouchableOpacity activeOpacity={0.8}>
+      <TouchableOpacity 
+        activeOpacity={0.8}
+        onPress={() => navigation.navigate('MatchDetails', { 
+            matchId,
+            team1Name,
+            team2Name
+        })}
+      >
         <Card style={styles.matchCard}>
           <View style={styles.cardHeader}>
               <ThemedText variant="small" color="textSecondary" numberOfLines={1} style={{ flex: 1 }}>{seriesName}</ThemedText>
@@ -306,6 +321,15 @@ export const FixturesScreen: React.FC = () => {
         onViewableItemsChanged={handleViewableItemsChanged}
         viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
         stickySectionHeadersEnabled={true}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={() => (
+          loadingMore ? (
+            <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+              <ActivityIndicator size="small" color={theme.primary} />
+            </View>
+          ) : null
+        )}
         onScrollToIndexFailed={(info: any) => {
           setTimeout(() => {
             sectionListRef.current?.scrollToLocation({
@@ -335,7 +359,7 @@ export const FixturesScreen: React.FC = () => {
         initialNumToRender={100}
         maxToRenderPerBatch={30}
         windowSize={11}
-        ListEmptyComponent={<View style={styles.empty}><ThemedText>No matches for this format</ThemedText></View>}
+        ListEmptyComponent={!loading && !refreshing ? <View style={styles.empty}><ThemedText>No matches for this format</ThemedText></View> : null}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

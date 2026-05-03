@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, StyleSheet, TouchableOpacity, SectionList, TextInput } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, SectionList, TextInput, RefreshControl } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { spacing } from '../theme';
 import { Text as ThemedText } from '../components/ui/Text';
@@ -10,18 +10,20 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 
 import { SeriesService } from '../services/series.service';
-import { useFetch } from '../hooks/useFetch';
-import { RefreshControl } from 'react-native';
+import { usePagination } from '../hooks/usePagination';
+import { useDebounce } from '../hooks/useDebounce';
+import { ActivityIndicator } from 'react-native';
 
-type TabType = 'all' | 'active' | 'international' | 'domestic' | 'leagues';
+type TabType = 'all' | 'active' | 'International' | 'Domestic' | 'League' | 'Women';
 
 // Define the param list for the Top Tabs
 type TopTabParamList = {
     All: { type: 'all' };
     Active: { type: 'active' };
-    International: { type: 'international' };
-    Domestic: { type: 'domestic' };
-    Leagues: { type: 'leagues' };
+    International: { type: 'International' };
+    Domestic: { type: 'Domestic' };
+    Leagues: { type: 'League' };
+    Women: { type: 'Women' };
 };
 
 interface Series {
@@ -48,29 +50,43 @@ const TopTab = createMaterialTopTabNavigator<TopTabParamList>();
 
 const SeriesList = () => {
     const route = useRoute<RouteProp<TopTabParamList, keyof TopTabParamList>>();
-    const { type } = route.params;
+    const { type } = (route.params as any) || { type: 'all' };
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
     const { theme } = useTheme();
     const [search, setSearch] = useState('');
+    const debouncedSearch = useDebounce(search, 500);
 
-    const { data: fetchedSeries, loading, execute: fetchSeries } = useFetch(
-        () => SeriesService.getSeries({ type, search }),
-        [type, search]
+    const filters = useMemo(() => {
+        const f: any = { search: debouncedSearch };
+        if (type === 'active') {
+            f.status = 'Running';
+        } else if (type !== 'all') {
+            f.seriesType = type;
+        }
+        return f;
+    }, [type, debouncedSearch]);
+
+    const {
+        items: fetchedSeries,
+        loading,
+        loadingMore,
+        refreshing,
+        loadMore,
+        refresh
+    } = usePagination<any>(
+        (params) => SeriesService.getSeries({ ...filters, ...params }),
+        [filters]
     );
 
-    const [refreshing, setRefreshing] = useState(false);
+    const onRefresh = React.useCallback(() => {
+        refresh();
+    }, [refresh]);
 
-    const onRefresh = React.useCallback(async () => {
-        setRefreshing(true);
-        await fetchSeries();
-        setRefreshing(false);
-    }, [fetchSeries]);
-
-    // Memoize filtering/grouping
+    // Memoize grouping (rely on backend sorting)
     const groupedSeries = useMemo(() => {
-        if (!fetchedSeries) return [];
+        if (!fetchedSeries || !Array.isArray(fetchedSeries)) return [];
 
-        return fetchedSeries.reduce((acc: any, series: any) => {
+        return fetchedSeries.reduce((acc: { title: string; data: any[] }[], series: any) => {
             const date = series.startDate ? new Date(series.startDate) : new Date();
             const month = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
@@ -81,7 +97,7 @@ const SeriesList = () => {
                 acc.push({ title: month, data: [series] });
             }
             return acc;
-        }, [] as { title: string; data: any[] }[]);
+        }, []);
     }, [fetchedSeries]);
 
     return (
@@ -99,7 +115,7 @@ const SeriesList = () => {
 
             <SectionList
                 sections={groupedSeries}
-                keyExtractor={item => item.id}
+                keyExtractor={item => item._id || item.id}
                 renderSectionHeader={({ section }) => (
                     <View style={[styles.monthHeader, { backgroundColor: theme.background }]}>
                         <ThemedText variant="subtitle" weight="bold">{section.title}</ThemedText>
@@ -120,12 +136,21 @@ const SeriesList = () => {
                                 {item.startDate ? new Date(item.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''} -
                                 {item.endDate ? new Date(item.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
                             </ThemedText>
-                            <ThemedText variant="caption" color="primary" weight="semibold">Tournament: {item.tournamentId?.name || 'Generic'}</ThemedText>
+                            {/* <ThemedText variant="caption" color="primary" weight="semibold">Tournament: {item.tournamentId?.name || 'Generic'}</ThemedText> */}
                         </View>
                     </TouchableOpacity>
                 )}
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
+                onEndReached={loadMore}
+                onEndReachedThreshold={0.5}
+                ListFooterComponent={() => (
+                    loadingMore ? (
+                        <View style={styles.footerLoader}>
+                            <ActivityIndicator size="small" color={theme.primary} />
+                        </View>
+                    ) : null
+                )}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
@@ -135,7 +160,7 @@ const SeriesList = () => {
                     />
                 }
                 ListEmptyComponent={
-                    !loading ? (
+                    !loading && !refreshing ? (
                         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 50 }}>
                             <ThemedText color="textSecondary">No series found</ThemedText>
                         </View>
@@ -170,9 +195,10 @@ export const SeriesScreen: React.FC = () => {
             >
                 <TopTab.Screen name="All" component={SeriesList} initialParams={{ type: 'all' }} />
                 <TopTab.Screen name="Active" component={SeriesList} initialParams={{ type: 'active' }} />
-                <TopTab.Screen name="International" component={SeriesList} initialParams={{ type: 'international' }} />
-                <TopTab.Screen name="Domestic" component={SeriesList} initialParams={{ type: 'domestic' }} />
-                <TopTab.Screen name="Leagues" component={SeriesList} initialParams={{ type: 'leagues' }} />
+                <TopTab.Screen name="International" component={SeriesList} initialParams={{ type: 'International' }} />
+                <TopTab.Screen name="Domestic" component={SeriesList} initialParams={{ type: 'Domestic' }} />
+                <TopTab.Screen name="Leagues" component={SeriesList} initialParams={{ type: 'League' }} />
+                <TopTab.Screen name="Women" component={SeriesList} initialParams={{ type: 'Women' }} />
             </TopTab.Navigator>
         </View>
     );
@@ -190,4 +216,5 @@ const styles = StyleSheet.create({
     imageContainer: { width: 60, height: 60, borderRadius: 8, backgroundColor: 'rgba(56, 189, 248, 0.1)', justifyContent: 'center', alignItems: 'center', marginRight: spacing.md },
     emoji: { fontSize: 32 },
     cardContent: { flex: 1, justifyContent: 'center', gap: 4 },
+    footerLoader: { paddingVertical: spacing.md, alignItems: 'center' },
 });

@@ -46,7 +46,6 @@ export const OnboardingScreen: React.FC = () => {
 
   const handleContinue = async () => {
     await completeOnboarding();
-    navigation.replace("Login");
   };
 
   return (

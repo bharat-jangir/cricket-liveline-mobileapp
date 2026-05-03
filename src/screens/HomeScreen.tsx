@@ -128,10 +128,10 @@ export const HomeScreen: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Fetch Live Matches
-  const { data: liveMatches, execute: fetchLiveMatches, loading: loadingLiveMatches } = useFetch(() =>
-    MatchService.getMatches({ status: 'live', limit: 10 }),
-    []
-  );
+  const { data: liveMatches, execute: fetchLiveMatches, loading: loadingLiveMatches } = useFetch(async () => {
+    const res = await MatchService.getMatches({ status: 'live', limit: 10 });
+    return res;
+  }, []);
 
   // Live socket updates for the listing screen
   const { liveUpdates, isConnected: socketConnected } = useLiveMatches();
@@ -219,9 +219,10 @@ export const HomeScreen: React.FC = () => {
     const team2Name = socketData?.teamB?.name || item.team2?.name || item.team2?.code || item.teamBId?.shortName || 'Team 2';
     const team1Code = socketData?.teamA?.code || item.team1?.code || team1Name.slice(0, 3).toUpperCase();
     const team2Code = socketData?.teamB?.code || item.team2?.code || team2Name.slice(0, 3).toUpperCase();
-    const team1Score = socketData?.teamA?.score;
-    const team2Score = socketData?.teamB?.score;
-    const hasLiveScore = !!(team1Score && team2Score);
+    const team1Score = socketData?.teamA?.score || item.team1?.score || item.score1;
+    const team2Score = socketData?.teamB?.score || item.team2?.score || item.score2;
+    const team1Overs = socketData?.teamA?.overs || item.team1?.overs;
+    const team2Overs = socketData?.teamB?.overs || item.team2?.overs;
 
     return (
       <TouchableOpacity
@@ -234,40 +235,30 @@ export const HomeScreen: React.FC = () => {
       >
         <Card style={styles.liveMatchCard} elevation="md">
           <View style={styles.cardHeader}>
-            <ThemedText style={[styles.matchTitleText, { color: theme.textSecondary }]} numberOfLines={1}>
-              {team1Code} vs {team2Code}
+            <ThemedText style={[styles.matchTitleText, { color: theme.textSecondary, flex: 1 }]} numberOfLines={1}>
+              {item.series ? `${item.series} • ` : ''}{item.title || ''}
             </ThemedText>
+
+
             <View style={styles.liveIndicator}>
               <View style={[styles.liveDot, { backgroundColor: socketConnected ? '#22c55e' : '#ef4444' }]} />
               <ThemedText style={styles.liveText}>LIVE</ThemedText>
             </View>
           </View>
           <View style={styles.matchInfo}>
-            {hasLiveScore ? (
-              <>
-                <ThemedText style={[styles.teamScore, { color: theme.text }]} numberOfLines={1}>
-                  {team1Code}: {team1Score} ({socketData?.teamA?.overs})
-                </ThemedText>
-                <ThemedText style={[styles.teamScore, { color: theme.textSecondary }]} numberOfLines={1}>
-                  {team2Code}: {team2Score}
-                </ThemedText>
-                {socketData?.lastBallLabel ? (
-                  <View style={styles.lastBallBadge}>
-                    <ThemedText style={styles.lastBallText}>{socketData.lastBallLabel}</ThemedText>
-                  </View>
-                ) : null}
-              </>
-            ) : (
-              <>
-                <ThemedText style={[styles.teamScore, { color: theme.text }]} numberOfLines={1}>
-                  {item.series || item.title || 'Match'}
-                </ThemedText>
-                <ThemedText style={[{ fontSize: 10, color: theme.textSecondary }]} numberOfLines={1}>
-                  {item.result || item.status || 'Match Scheduled'}
-                </ThemedText>
-              </>
-            )}
+            <View style={styles.scoreRow}>
+              <ThemedText style={[styles.teamScore, { color: theme.text }]} numberOfLines={1}>
+                {team1Code}: {team1Score || (team1Overs ? '0/0' : '')} {team1Overs ? `(${team1Overs})` : ''}
+              </ThemedText>
+            </View>
+            <View style={styles.scoreRow}>
+              <ThemedText style={[styles.teamScore, { color: theme.textSecondary }]} numberOfLines={1}>
+                {team2Code}: {team2Score || (team2Overs ? '0/0' : '')} {team2Overs ? `(${team2Overs})` : ''}
+              </ThemedText>
+            </View>
           </View>
+
+
         </Card>
       </TouchableOpacity>
     );
@@ -711,6 +702,11 @@ const styles = StyleSheet.create({
   },
   teamScore: {
     fontSize: fontSize.xs,
+    marginBottom: 2,
+  },
+  scoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 2,
   },
   // News Cards

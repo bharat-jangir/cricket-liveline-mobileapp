@@ -15,8 +15,8 @@ export const MatchService = {
       if (filters.limit) params.append('limit', filters.limit.toString());
 
       const response = await axiosInstance.get(`/app/matches?${params.toString()}`);
-      // app matches response: { statusCode, status, data: { result: [...] } }
-      return response.data?.data?.result ?? response.data?.data ?? response.data;
+      const result = response.data?.data?.result ?? response.data?.result ?? response.data?.data ?? response.data;
+      return Array.isArray(result) ? result : [];
     } catch (error) {
       console.error('Error fetching matches:', error);
       throw error;
@@ -150,6 +150,44 @@ export const MatchService = {
     } catch (error) {
       console.error(`Error fetching analytics for match ${matchId}:`, error);
       return [];
+    }
+  },
+
+  getSeries: async (params: { search?: string; status?: string; page?: number; limit?: number } = {}) => {
+    try {
+      const query = new URLSearchParams();
+      if (params.search) query.append('search', params.search);
+      if (params.status) query.append('status', params.status);
+      if (params.page) query.append('page', params.page.toString());
+      if (params.limit) query.append('limit', params.limit.toString());
+
+      const response = await axiosInstance.get(`/app/series?${query.toString()}`);
+      // Return the full data object which includes { result, pagination }
+      return response.data?.data ?? response.data;
+    } catch (error) {
+      console.error('Error fetching series:', error);
+      throw error;
+    }
+  },
+
+  getSeriesDetails: async (seriesId: string) => {
+    try {
+      const response = await axiosInstance.get(`/app/series/${seriesId}`);
+      return response.data?.data?.result ?? response.data?.data ?? response.data;
+    } catch (error) {
+      console.error(`Error fetching series details for ${seriesId}:`, error);
+      throw error;
+    }
+  },
+
+  getSeriesMatches: async (seriesId: string) => {
+    try {
+      // The backend uses matches.findAll with seriesId filter
+      const response = await axiosInstance.get(`/app/matches?seriesId=${seriesId}`);
+      return response.data?.data?.result ?? response.data?.data ?? response.data;
+    } catch (error) {
+      console.error(`Error fetching matches for series ${seriesId}:`, error);
+      throw error;
     }
   },
 };
