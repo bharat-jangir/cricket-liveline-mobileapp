@@ -90,8 +90,9 @@ export const fetchLiveStatus = createAsyncThunk(
 
 export const fetchCommentary = createAsyncThunk(
   'match/fetchCommentary',
-  async (matchId: string) => {
-    return await MatchService.getCommentary(matchId);
+  async ({ matchId, page = 1, limit = 20, type = 'all', inningId }: { matchId: string; page?: number; limit?: number; type?: string; inningId?: string }) => {
+    const data = await MatchService.getCommentary(matchId, { page, limit, type, inningId });
+    return { data, page, type, inningId };
   }
 );
 
@@ -372,6 +373,9 @@ const matchSlice = createSlice({
         state.sessions = action.payload.sessions;
       }
     },
+    clearCommentary: (state) => {
+      state.commentary = [];
+    },
   },
   extraReducers: (builder) => {
     // Match Details
@@ -409,7 +413,17 @@ const matchSlice = createSlice({
     });
     builder.addCase(fetchCommentary.fulfilled, (state, action) => {
       state.loading.commentary = false;
-      state.commentary = action.payload;
+      const { data, page } = action.payload;
+      
+      if (page === 1) {
+        state.commentary = data;
+      } else {
+        // Filter out duplicates based on _id or ballId
+        const existingIds = new Set(state.commentary.map(item => item._id || item.ballId));
+        const newItems = data.filter((item: any) => !existingIds.has(item._id || item.ballId));
+        state.commentary = [...state.commentary, ...newItems];
+      }
+      
       state.refreshing.commentary = false;
     });
     builder.addCase(fetchCommentary.rejected, (state) => {
@@ -446,15 +460,27 @@ const matchSlice = createSlice({
     });
 
     // Squads
+    builder.addCase(fetchSquads.pending, (state) => {
+        state.loading.squads = true;
+    });
     builder.addCase(fetchSquads.fulfilled, (state, action) => {
         state.loading.squads = false;
         state.squads = action.payload;
     });
+    builder.addCase(fetchSquads.rejected, (state) => {
+        state.loading.squads = false;
+    });
 
     // Sessions
+    builder.addCase(fetchSessions.pending, (state) => {
+        state.loading.sessions = true;
+    });
     builder.addCase(fetchSessions.fulfilled, (state, action) => {
         state.loading.sessions = false;
         state.sessions = action.payload;
+    });
+    builder.addCase(fetchSessions.rejected, (state) => {
+        state.loading.sessions = false;
     });
 
     // Partnerships
@@ -511,7 +537,8 @@ export const {
     updateCommentaryFromSocket,
     removeLatestCommentary,
     updateScorecardFromSocket,
-    updateSessionsFromSocket
+    updateSessionsFromSocket,
+    clearCommentary
 } = matchSlice.actions;
 
 export default matchSlice.reducer;

@@ -23,6 +23,7 @@ import { MatchService } from "../services/match.service";
 import { useFetch } from "../hooks/useFetch";
 import { useLiveMatches } from "../hooks/useLiveMatches";
 import LogoSVG from '../../assets/cp-nobg-logo.svg';
+import { mergeTeamScore, mergeTeamOvers } from '../utils/score';
 
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -219,10 +220,10 @@ export const HomeScreen: React.FC = () => {
     const team2Name = socketData?.teamB?.name || item.team2?.name || item.team2?.code || item.teamBId?.shortName || 'Team 2';
     const team1Code = socketData?.teamA?.code || item.team1?.code || team1Name.slice(0, 3).toUpperCase();
     const team2Code = socketData?.teamB?.code || item.team2?.code || team2Name.slice(0, 3).toUpperCase();
-    const team1Score = socketData?.teamA?.score || item.team1?.score || item.score1;
-    const team2Score = socketData?.teamB?.score || item.team2?.score || item.score2;
-    const team1Overs = socketData?.teamA?.overs || item.team1?.overs;
-    const team2Overs = socketData?.teamB?.overs || item.team2?.overs;
+    const team1Score = mergeTeamScore(item.team1?.score || item.score1, socketData?.teamA?.score);
+    const team2Score = mergeTeamScore(item.team2?.score || item.score2, socketData?.teamB?.score);
+    const team1Overs = mergeTeamOvers(item.team1?.overs, socketData?.teamA?.overs);
+    const team2Overs = mergeTeamOvers(item.team2?.overs, socketData?.teamB?.overs);
 
     return (
       <TouchableOpacity

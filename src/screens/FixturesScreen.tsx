@@ -4,11 +4,11 @@ import {
   StyleSheet,
   SectionList,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
   Animated,
   Modal,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,10 +17,12 @@ import { Text as ThemedText } from '../components/ui/Text';
 import { Card } from '../components/ui/Card';
 import { spacing, borderRadius } from '../theme';
 import { useNavigation } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { MatchService } from '../services/match.service';
-import { usePagination } from '../hooks/usePagination';
-import { ActivityIndicator } from 'react-native';
+import { MatchCard } from '../components/MatchCard';
+import { MatchCardSkeleton } from '../components/MatchCardSkeleton';
+
+
 
 const getLocalYMD = (d: Date) => {
   const year = d.getFullYear();
@@ -98,14 +100,24 @@ export const FixturesScreen: React.FC = () => {
   const sectionListRef = useRef<SectionList>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
 
-  const [rawMatches, setRawMatches] = useState<Match[]>([]);
+  const [rawMatches, setRawMatches] = useState<any[]>([]);
   const [selectedFormat, setSelectedFormat] = useState<MatchFormat>('All');
   const [showTodayBtn, setShowTodayBtn] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [currentVisibleSection, setCurrentVisibleSection] = useState<string>('');
-  const insets = useSafeAreaInsets();
+  
+  // Custom states for 2-way date-cursor based pagination
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadingMoreFuture, setLoadingMoreFuture] = useState(false);
+  const [loadingMorePast, setLoadingMorePast] = useState(false);
+  const [hasMorePast, setHasMorePast] = useState(true);
+  const [hasMoreFuture, setHasMoreFuture] = useState(true);
+  const [earliestCursor, setEarliestCursor] = useState<string>('');
+  const [latestCursor, setLatestCursor] = useState<string>('');
 
+  const insets = useSafeAreaInsets();
   const todayStr = useMemo(() => getLocalYMD(new Date()), []);
 
   const formatDateHeader = (dateStr: string) => {
@@ -129,43 +141,154 @@ export const FixturesScreen: React.FC = () => {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
   };
 
-  const { 
-    items: fetchedMatches, 
-    loading, 
-    loadingMore, 
-    refreshing, 
-    loadMore, 
-    refresh 
-  } = usePagination<Match>(
-    (params) => MatchService.getMatches({ ...params, status: 'scheduled', limit: 50 }),
-    []
-  );
+  const mapFormatForApi = (fmt: MatchFormat): string | undefined => {
+    if (fmt === 'All') return undefined;
+    return fmt.toLowerCase();
+  };
+
+  const fetchTimeline = async (anchorDate: Date, isInitial = false, isRefresh = false) => {
+    try {
+      if (isInitial) {
+        setLoading(true);
+      } else if (isRefresh) {
+        setRefreshing(true);
+      }
+
+      const anchorIso = anchorDate.toISOString();
+      const apiFormat = mapFormatForApi(selectedFormat);
+
+      // Perform parallel requests for future (upcoming) and past (recent results) matches
+      const [futureRes, pastRes] = await Promise.all([
+        MatchService.getMatches({
+          cursor: anchorIso,
+          direction: 'future',
+          limit: 15,
+          matchFormat: apiFormat,
+        }),
+        MatchService.getMatches({
+          cursor: anchorIso,
+          direction: 'past',
+          limit: 15,
+          matchFormat: apiFormat,
+        }),
+      ]);
+
+      // pastRes is returned reverse-chronological (newest past first, i.e., yesterday, then day before).
+      // We reverse it to chronological ascending so the final unified timeline list flows perfectly.
+      const reversedPast = [...pastRes].reverse();
+      const combined = [...reversedPast, ...futureRes];
+
+      setRawMatches(combined);
+
+      // Setup pagination boundary cursors and availability flags
+      if (reversedPast.length > 0) {
+        setEarliestCursor(reversedPast[0].time || reversedPast[0].matchTime || reversedPast[0].matchDate);
+        setHasMorePast(pastRes.length >= 15);
+      } else {
+        setEarliestCursor(anchorIso);
+        setHasMorePast(false);
+      }
+
+      if (futureRes.length > 0) {
+        setLatestCursor(futureRes[futureRes.length - 1].time || futureRes[futureRes.length - 1].matchTime || futureRes[futureRes.length - 1].matchDate);
+        setHasMoreFuture(futureRes.length >= 15);
+      } else {
+        setLatestCursor(anchorIso);
+        setHasMoreFuture(false);
+      }
+    } catch (error) {
+      console.error('[FixturesScreen] Error loading matches timeline:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const loadMoreFuture = async () => {
+    if (loadingMoreFuture || !hasMoreFuture || !latestCursor) return;
+
+    try {
+      setLoadingMoreFuture(true);
+      const apiFormat = mapFormatForApi(selectedFormat);
+      
+      const futureRes = await MatchService.getMatches({
+        cursor: latestCursor,
+        direction: 'future',
+        limit: 15,
+        matchFormat: apiFormat,
+      });
+
+      if (futureRes.length > 0) {
+        setRawMatches((prev) => [...prev, ...futureRes]);
+        setLatestCursor(futureRes[futureRes.length - 1].time || futureRes[futureRes.length - 1].matchTime || futureRes[futureRes.length - 1].matchDate);
+        setHasMoreFuture(futureRes.length >= 15);
+      } else {
+        setHasMoreFuture(false);
+      }
+    } catch (error) {
+      console.error('[FixturesScreen] Error loading future matches:', error);
+    } finally {
+      setLoadingMoreFuture(false);
+    }
+  };
+
+  const loadMorePast = async () => {
+    if (loadingMorePast || !hasMorePast || !earliestCursor) return;
+
+    try {
+      setLoadingMorePast(true);
+      const apiFormat = mapFormatForApi(selectedFormat);
+
+      const pastRes = await MatchService.getMatches({
+        cursor: earliestCursor,
+        direction: 'past',
+        limit: 15,
+        matchFormat: apiFormat,
+      });
+
+      if (pastRes.length > 0) {
+        const reversedPast = [...pastRes].reverse();
+        setRawMatches((prev) => [...reversedPast, ...prev]);
+        setEarliestCursor(reversedPast[0].time || reversedPast[0].matchTime || reversedPast[0].matchDate);
+        setHasMorePast(pastRes.length >= 15);
+      } else {
+        setHasMorePast(false);
+      }
+    } catch (error) {
+      console.error('[FixturesScreen] Error loading past matches:', error);
+    } finally {
+      setLoadingMorePast(false);
+    }
+  };
+
+  useEffect(() => {
+    setRawMatches([]);
+    setEarliestCursor('');
+    setLatestCursor('');
+    setHasMorePast(true);
+    setHasMoreFuture(true);
+    fetchTimeline(new Date(), true);
+  }, [selectedFormat]);
 
   const onRefresh = React.useCallback(() => {
-    refresh();
-  }, [refresh]);
+    fetchTimeline(new Date(), false, true);
+  }, [selectedFormat]);
 
   const sections = useMemo<MatchSection[]>(() => {
-    const dataSource = fetchedMatches || rawMatches;
+    const dataSource = rawMatches;
     
-    // Normalize format match format
-    const filtered = selectedFormat === 'All' 
-        ? dataSource 
-        : dataSource.filter((m: any) => m.matchType === selectedFormat || m.format === selectedFormat);
-        
-    const grouped = filtered.reduce((acc: Record<string, Match[]>, m: any) => {
-      // Use matchDate from API, or date from mock
-      const dateKey = m.matchDate ? getLocalYMD(new Date(m.matchDate)) : m.date; 
+    const grouped = dataSource.reduce((acc: Record<string, any[]>, m: any) => {
+      const dateKey = m.time ? getLocalYMD(new Date(m.time)) : m.date; 
       acc[dateKey] = [...(acc[dateKey] || []), m];
       return acc;
-    }, {} as Record<string, Match[]>);
+    }, {} as Record<string, any[]>);
 
     return Object.keys(grouped).sort().map(date => ({
       title: formatDateHeader(date),
       date,
       data: grouped[date],
     }));
-  }, [rawMatches, fetchedMatches, selectedFormat]);
+  }, [rawMatches]);
 
   const jumpToDate = (date: Date) => {
     const dateStr = getLocalYMD(date);
@@ -218,9 +341,8 @@ export const FixturesScreen: React.FC = () => {
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(currentYear, currentMonth, day);
       const dateStr = getLocalYMD(date);
-      // Fallback search
-      const hasMatches = (fetchedMatches || rawMatches).some((m: any) => {
-          const mDate = m.matchDate ? getLocalYMD(new Date(m.matchDate)) : m.date;
+      const hasMatches = rawMatches.some((m: any) => {
+          const mDate = m.time ? getLocalYMD(new Date(m.time)) : m.date;
           return mDate === dateStr;
       });
       const isToday = dateStr === todayStr;
@@ -249,126 +371,163 @@ export const FixturesScreen: React.FC = () => {
 
   const navigation = useNavigation<any>();
 
+  const mapApiToMatch = (item: any) => {
+    return {
+      id: item.id || item._id,
+      series: item.series || 'Series',
+      format: (item.format || 'T20').toUpperCase(),
+      team1: {
+        name: item.team1?.name || 'Team 1',
+        code: item.team1?.code || 'T1',
+        score: item.team1?.score,
+        overs: item.team1?.overs,
+      },
+      team2: {
+        name: item.team2?.name || 'Team 2',
+        code: item.team2?.code || 'T2',
+        score: item.team2?.score,
+        overs: item.team2?.overs,
+      },
+      status: item.status || 'Scheduled',
+      venue: item.venue || 'Venue',
+      time: item.time ? new Date(item.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+      result: item.result,
+    };
+  };
+
   const renderMatch = ({ item }: { item: any }) => {
-    
-    const team1Name = item.teamAId?.shortName || item.teamAId?.name || item.teamA?.shortName || item.teamA?.code || item.team1?.code || 'T1';
-    const team2Name = item.teamBId?.shortName || item.teamBId?.name || item.teamB?.shortName || item.teamB?.code || item.team2?.code || 'T2';
-    const seriesName = item.seriesId?.name || item.series?.name || item.series || 'Series';
-    const matchFormat = item.matchType || item.format || 'Format';
-    const venueName = item.venueId?.name || item.venue?.name || item.venue || 'Venue TBD';
-    const timeStr = item.matchTime ? new Date(item.matchTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : item.time || '';
-    const matchId = item._id || item.id;
-    
+    const mapped = mapApiToMatch(item);
     return (
-      <TouchableOpacity 
-        activeOpacity={0.8}
-        onPress={() => navigation.navigate('MatchDetails', { 
-            matchId,
-            team1Name,
-            team2Name
-        })}
-      >
-        <Card style={styles.matchCard}>
-          <View style={styles.cardHeader}>
-              <ThemedText variant="small" color="textSecondary" numberOfLines={1} style={{ flex: 1 }}>{seriesName}</ThemedText>
-              <View style={[styles.badge, { backgroundColor: theme.primary + '15' }]}>
-              <ThemedText variant="small" weight="bold" style={{ color: theme.primary }}>{matchFormat}</ThemedText>
-              </View>
-          </View>
-          <View style={styles.teamsRow}>
-              <ThemedText weight="bold">{team1Name}</ThemedText>
-              <ThemedText color="textSecondary" style={{ marginHorizontal: 15 }}>VS</ThemedText>
-              <ThemedText weight="bold">{team2Name}</ThemedText>
-          </View>
-          <View>
-              <ThemedText variant="small" color="textSecondary" numberOfLines={1}>{item.title}</ThemedText>
-              <ThemedText variant="small" color="textSecondary">{venueName} • {timeStr}</ThemedText>
-          </View>
-        </Card>
-      </TouchableOpacity>
+      <View style={{ marginBottom: spacing.md, marginHorizontal: spacing.md }}>
+        <MatchCard 
+          match={mapped}
+          onPress={() => navigation.navigate('MatchDetails', { 
+              matchId: mapped.id,
+              team1Name: mapped.team1.name,
+              team2Name: mapped.team2.name
+          })}
+        />
+      </View>
+    );
+  };
+
+  const renderListHeader = () => {
+    if (!hasMorePast) return null;
+    return (
+      <View style={styles.headerLoaderContainer}>
+        {loadingMorePast ? (
+          <ActivityIndicator size="small" color={theme.primary} />
+        ) : (
+          <TouchableOpacity
+            style={[styles.loadOlderBtn, { borderColor: theme.primary + '50' }]}
+            onPress={loadMorePast}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="time-outline" size={14} color={theme.primary} />
+            <ThemedText variant="small" weight="bold" style={{ color: theme.primary, marginLeft: 4 }}>
+              LOAD OLDER MATCHES
+            </ThemedText>
+          </TouchableOpacity>
+        )}
+      </View>
     );
   };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <LinearGradient colors={isDark ? [theme.surface, theme.background] : [theme.primary, theme.primaryDark]} style={styles.header}>
-        <ThemedText variant="title" color="white" weight="bold" style={styles.headerTitle}>Fixtures</ThemedText>
+        <SafeAreaView edges={['top']}>
+          <ThemedText variant="title" color="white" weight="bold" style={styles.headerTitle}>Fixtures</ThemedText>
 
-        <View style={styles.filterContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-            {(['All', 'T20', 'ODI', 'Test'] as MatchFormat[]).map((fmt) => (
-              <TouchableOpacity
-                key={fmt}
-                onPress={() => setSelectedFormat(fmt)}
-                style={[styles.filterTab, selectedFormat === fmt && { backgroundColor: theme.surface }]}
-              >
-                <ThemedText variant="small" weight="bold" style={{ color: selectedFormat === fmt ? theme.primary : 'white' }}>
-                  {fmt}
-                </ThemedText>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          <View style={styles.filterContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+              {(['All', 'T20', 'ODI', 'Test'] as MatchFormat[]).map((fmt) => (
+                <TouchableOpacity
+                  key={fmt}
+                  onPress={() => setSelectedFormat(fmt)}
+                  style={[styles.filterTab, selectedFormat === fmt && { backgroundColor: theme.surface }]}
+                >
+                  <ThemedText variant="small" weight="bold" style={{ color: selectedFormat === fmt ? theme.primary : 'white' }}>
+                    {fmt}
+                  </ThemedText>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
 
-          <TouchableOpacity style={styles.calendarBtn} onPress={() => setShowCalendar(true)}>
-            <Ionicons name="calendar-outline" size={22} color="white" />
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>      <SectionList
-        ref={sectionListRef}
-        sections={sections}
-        renderItem={renderMatch}
-        onScroll={handleScroll}
-        onViewableItemsChanged={handleViewableItemsChanged}
-        viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
-        stickySectionHeadersEnabled={true}
-        onEndReached={loadMore}
-        onEndReachedThreshold={0.5}
-        ListFooterComponent={() => (
-          loadingMore ? (
-            <View style={{ paddingVertical: 20, alignItems: 'center' }}>
-              <ActivityIndicator size="small" color={theme.primary} />
+            <TouchableOpacity style={styles.calendarBtn} onPress={() => setShowCalendar(true)}>
+              <Ionicons name="calendar-outline" size={22} color="white" />
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </LinearGradient>
+
+      {loading && rawMatches.length === 0 ? (
+        <ScrollView style={{ padding: spacing.md }}>
+          {[1, 2, 3, 4].map(i => (
+            <View key={i} style={{ marginBottom: spacing.md }}>
+              <MatchCardSkeleton />
             </View>
-          ) : null
-        )}
-        onScrollToIndexFailed={(info: any) => {
-          setTimeout(() => {
-            sectionListRef.current?.scrollToLocation({
-              sectionIndex: info.highestMeasuredFrameIndex,
-              itemIndex: 0,
-              animated: false,
-            });
+          ))}
+        </ScrollView>
+      ) : (
+        <SectionList
+          ref={sectionListRef}
+          sections={sections}
+          renderItem={renderMatch}
+          onScroll={handleScroll}
+          onViewableItemsChanged={handleViewableItemsChanged}
+          viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
+          stickySectionHeadersEnabled={true}
+          onEndReached={loadMoreFuture}
+          onEndReachedThreshold={0.5}
+          ListHeaderComponent={renderListHeader}
+          ListFooterComponent={() => (
+            loadingMoreFuture ? (
+              <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                <ActivityIndicator size="small" color={theme.primary} />
+              </View>
+            ) : null
+          )}
+          onScrollToIndexFailed={(info: any) => {
             setTimeout(() => {
               sectionListRef.current?.scrollToLocation({
-                sectionIndex: info.index,
+                sectionIndex: info.highestMeasuredFrameIndex,
                 itemIndex: 0,
-                animated: true,
-                viewOffset: 0,
+                animated: false,
               });
+              setTimeout(() => {
+                sectionListRef.current?.scrollToLocation({
+                  sectionIndex: info.index,
+                  itemIndex: 0,
+                  animated: true,
+                  viewOffset: 0,
+                });
+              }, 100);
             }, 100);
-          }, 100);
-        }}
-        renderSectionHeader={({ section: { title } }) => (
-          <View style={[styles.sectionHeader, { backgroundColor: theme.background, borderBottomColor: theme.borderLight }]}>
-            <ThemedText variant="small" weight="bold" style={{ color: theme.primary }}>
-              {title}
-            </ThemedText>
-          </View>
-        )}
-        keyExtractor={(item) => item._id}
-        contentContainerStyle={{ paddingBottom: 120 }}
-        initialNumToRender={100}
-        maxToRenderPerBatch={30}
-        windowSize={11}
-        ListEmptyComponent={!loading && !refreshing ? <View style={styles.empty}><ThemedText>No matches for this format</ThemedText></View> : null}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={theme.primary}
-            colors={[theme.primary]}
-          />
-        }
-      />
+          }}
+          renderSectionHeader={({ section: { title } }) => (
+            <View style={[styles.sectionHeader, { backgroundColor: theme.background, borderBottomColor: theme.borderLight }]}>
+              <ThemedText variant="small" weight="bold" style={{ color: theme.primary }}>
+                {title}
+              </ThemedText>
+            </View>
+          )}
+          keyExtractor={(item) => item.id || item._id}
+          contentContainerStyle={{ paddingBottom: 120 }}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          ListEmptyComponent={!loading && !refreshing ? <View style={styles.empty}><ThemedText>No matches for this format</ThemedText></View> : null}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={theme.primary}
+              colors={[theme.primary]}
+            />
+          }
+        />
+      )}
       {showTodayBtn && (
         <Animated.View style={styles.floatingContainer}>
           <TouchableOpacity
@@ -420,7 +579,20 @@ export const FixturesScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  headerLoaderContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+  },
+  loadOlderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
   header: { paddingBottom: 15 },
+
   headerTitle: { textAlign: 'center', marginTop: 10 },
   filterContainer: {
     flexDirection: 'row',

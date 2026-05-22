@@ -131,6 +131,7 @@ export interface MatchUpdate {
   requiredRuns?: number;
   remainingBalls?: number;
   powerPlay?: boolean;
+  speech?: boolean;
 }
 
 export interface BatterDelta {
@@ -352,7 +353,7 @@ export function useLiveMatch(matchId: string | null): UseLiveMatchReturn {
       // Over Commentary logic removed from here and moved to powerplay_update
       // where the backend sends the onOC flag.
 
-      if (curBall) {
+      if (data.speech && curBall) {
         const lowerBall = curBall.toLowerCase();
         let textToSpeak = '';
 

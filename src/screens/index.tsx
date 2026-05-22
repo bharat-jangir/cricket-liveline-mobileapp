@@ -15,6 +15,7 @@ import { Card } from '@/components/ui/Card';
 import { spacing, fontSize, scale } from '@/theme';
 import { useLiveMatches } from '../hooks/useLiveMatches';
 import LogoSVG from '../../assets/cp-nobg-logo.svg';
+import { mergeTeamScore, mergeTeamOvers } from '../utils/score';
 
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { MatchCard } from '@/components/MatchCard';
@@ -65,14 +66,14 @@ const MatchList = ({ route }: any) => {
       team1: {
         name: team1Name,
         code: socketData?.teamA?.code || item.team1?.code || item.teamAId?.shortName || 'T1',
-        score: socketData?.teamA?.score || item.team1?.score || item.liveStatus?.score || item.team1Score,
-        overs: socketData?.teamA?.overs || item.team1?.overs || item.liveStatus?.overs || item.team1Overs,
+        score: mergeTeamScore(item.team1?.score || item.liveStatus?.score || item.team1Score, socketData?.teamA?.score),
+        overs: mergeTeamOvers(item.team1?.overs || item.liveStatus?.overs || item.team1Overs, socketData?.teamA?.overs),
       },
       team2: {
         name: team2Name,
         code: socketData?.teamB?.code || item.team2?.code || item.teamBId?.shortName || 'T2',
-        score: socketData?.teamB?.score || item.team2?.score || item.liveStatus?.team2Score || item.team2Score,
-        overs: socketData?.teamB?.overs || item.team2?.overs || item.liveStatus?.team2Overs || item.team2Overs,
+        score: mergeTeamScore(item.team2?.score || item.liveStatus?.team2Score || item.team2Score, socketData?.teamB?.score),
+        overs: mergeTeamOvers(item.team2?.overs || item.liveStatus?.team2Overs || item.team2Overs, socketData?.teamB?.overs),
       },
       status: item.status === 'live' ? 'Live' : (item.status === 'scheduled' ? 'Scheduled' : 'Completed'),
       venue: item.venueId?.name || item.venue?.name || item.venue || 'Venue',

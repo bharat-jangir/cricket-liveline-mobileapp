@@ -4,6 +4,9 @@ export interface MatchFilters {
   status?: 'scheduled' | 'live' | 'completed' | 'abandoned';
   page?: number;
   limit?: number;
+  cursor?: string;
+  direction?: 'past' | 'future';
+  matchFormat?: string;
 }
 
 export const MatchService = {
@@ -13,6 +16,11 @@ export const MatchService = {
       if (filters.status) params.append('status', filters.status);
       if (filters.page) params.append('page', filters.page.toString());
       if (filters.limit) params.append('limit', filters.limit.toString());
+      if (filters.cursor) params.append('cursor', filters.cursor);
+      if (filters.direction) params.append('direction', filters.direction);
+      if (filters.matchFormat) params.append('matchFormat', filters.matchFormat);
+
+
 
       const response = await axiosInstance.get(`/app/matches?${params.toString()}`);
       const result = response.data?.data?.result ?? response.data?.result ?? response.data?.data ?? response.data;
@@ -131,9 +139,15 @@ export const MatchService = {
     }
   },
 
-  getCommentary: async (matchId: string) => {
+  getCommentary: async (matchId: string, params: { page?: number, limit?: number, type?: string, inningId?: string } = {}) => {
     try {
-      const response = await axiosInstance.get(`/app/matches/${matchId}/commentary`);
+      const query = new URLSearchParams();
+      if (params.page) query.append('page', params.page.toString());
+      if (params.limit) query.append('limit', params.limit.toString());
+      if (params.type) query.append('type', params.type);
+      if (params.inningId) query.append('inningId', params.inningId);
+
+      const response = await axiosInstance.get(`/app/matches/${matchId}/commentary?${query.toString()}`);
       const data = response.data?.data?.result ?? response.data?.result ?? response.data?.data ?? response.data;
       return Array.isArray(data) ? data : [];
     } catch (error) {
