@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, TouchableOpacity, ScrollView, StyleSheet, FlatList } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, TouchableOpacity, ScrollView, StyleSheet, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -7,6 +7,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { spacing, fontSize, borderRadius } from '../theme';
 import { Card } from '../components/ui/Card';
 import { Text as ThemedText } from '../components/ui/Text';
+import { apiClient } from '../services/apiClient';
 
 type Gender = 'mens' | 'womens';
 type Format = 'odi' | 'test' | 't20';
@@ -57,14 +58,74 @@ export const RankingsScreen: React.FC = () => {
     const [gender, setGender] = useState<Gender>('mens');
     const [format, setFormat] = useState<Format>('odi');
     const [category, setCategory] = useState<Category>('batters');
+    const [rankingsData, setRankingsData] = useState<RankingData[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [cache, setCache] = useState<Record<string, RankingData[]>>({});
+    const [refreshing, setRefreshing] = useState(false);
 
-    const getRankingsData = () => {
-        switch (category) {
-            case 'batters': return mockBatters;
-            case 'bowlers': return mockBowlers;
-            case 'allrounders': return mockAllRounders;
-            case 'teams': return mockTeams;
-            default: return mockBatters;
+    useEffect(() => {
+        fetchRankings();
+    }, [gender, format, category]);
+
+    const fetchRankings = async (isRefresh = false) => {
+        const cacheKey = `${gender}-${format}-${category}`;
+
+        // Return cached data if not explicitly refreshing
+        if (!isRefresh && cache[cacheKey]) {
+            setRankingsData(cache[cacheKey]);
+            return;
+        }
+
+        try {
+            if (isRefresh) {
+                setRefreshing(true);
+            } else {
+                setLoading(true);
+            }
+            const queryGender = gender === 'mens' ? 'men' : 'women';
+            const queryType = category === 'teams' ? 'team' : 'player';
+            let queryRole = undefined;
+            
+            if (category === 'batters') queryRole = 'batting';
+            if (category === 'bowlers') queryRole = 'bowling';
+            if (category === 'allrounders') queryRole = 'all-rounder';
+
+            const response = await apiClient.get('/app/rankings', {
+                params: {
+                    gender: queryGender,
+                    format,
+                    type: queryType,
+                    ...(queryRole && { role: queryRole })
+                }
+            });
+
+            if (response.data && response.data.data) {
+                // The API structure likely returns an array in response.data.data
+                const data = Array.isArray(response.data.data) ? response.data.data : (response.data.data.result || []);
+                
+                const formattedData: RankingData[] = data.map((item: any) => ({
+                    id: item.playerId || item.cricbuzzId || item._id,
+                    rank: item.rank,
+                    name: item.name || item.teamName,
+                    team: item.country || item.teamCode || item.teamName,
+                    rating: item.rating || item.points || 0
+                }));
+                // Sort by rank ascending
+                formattedData.sort((a, b) => a.rank - b.rank);
+                setRankingsData(formattedData);
+                setCache(prev => ({ ...prev, [cacheKey]: formattedData }));
+            } else {
+                setRankingsData([]);
+            }
+        } catch (error) {
+            console.error('Failed to fetch rankings:', error);
+            if (!isRefresh) setRankingsData([]);
+        } finally {
+            if (isRefresh) {
+                setRefreshing(false);
+            } else {
+                setLoading(false);
+            }
         }
     };
 
@@ -184,13 +245,32 @@ export const RankingsScreen: React.FC = () => {
             </View>
 
             {/* List */}
-            <FlatList
-                data={getRankingsData()}
-                renderItem={renderRankingItem}
-                keyExtractor={(item) => `${category}-${item.rank}`}
-                contentContainerStyle={styles.listContent}
-                showsVerticalScrollIndicator={false}
-            />
+            {loading ? (
+                <View style={[styles.listContent, { flex: 1, justifyContent: 'center', alignItems: 'center' }]}>
+                    <ActivityIndicator size="large" color={theme.primary} />
+                </View>
+            ) : (
+                <FlatList
+                    data={rankingsData}
+                    renderItem={renderRankingItem}
+                    keyExtractor={(item, index) => `${category}-${item.id || item.rank}-${index}`}
+                    contentContainerStyle={styles.listContent}
+                    showsVerticalScrollIndicator={false}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={() => fetchRankings(true)}
+                            colors={[theme.primary]}
+                            tintColor={theme.primary}
+                        />
+                    }
+                    ListEmptyComponent={
+                        <View style={{ padding: 20, alignItems: 'center' }}>
+                            <ThemedText color="textSecondary">No rankings available.</ThemedText>
+                        </View>
+                    }
+                />
+            )}
         </View>
     );
 };
