@@ -375,23 +375,71 @@ export function useLiveMatch(matchId: string | null): UseLiveMatchReturn {
             return enOrdinals[idx] || enOrdinals[0];
         };
         
+        const TTS_MAP: Record<string, any> = {
+          // Break Codes
+          '/0': { en: 'Lunch Break', hi: 'Lunch Break', ta: 'Lunch Break' },
+          '/1': { en: 'Tea Break', hi: 'Tea Break', ta: 'Tea Break' },
+          '/2': { en: 'Stumps', hi: 'Stumps', ta: 'Stumps' },
+          // Special Events
+          'fh': { en: 'Free Hit', hi: 'Free Hit', ta: 'Free Hit' },
+          'cd': { en: 'Catch Drop', hi: 'Catch chhuta', ta: 'Catch Drop' },
+          'cc': { en: 'Covers Coming', hi: 'Covers aa rahe hain', ta: 'Covers Coming' },
+          'ba': { en: 'Ball in the air', hi: 'Hawa mein ball', ta: 'Ball in the air' },
+          'no': { en: 'Not out', hi: 'Not out', ta: 'Not out' },
+          'tu': { en: 'Third Umpire', hi: 'Third Umpire', ta: 'Third Umpire' },
+          'u': { en: 'Third Umpire', hi: 'Third Umpire', ta: 'Third Umpire' },
+          'ruka': { en: 'Bowler stopped', hi: 'Bowler ruk gaya', ta: 'Bowler stopped' },
+          'e': { en: 'Players entering', hi: 'Khiladi maidan mein', ta: 'Players entering' },
+          'a': { en: 'Appeal', hi: 'Appeal', ta: 'Appeal' },
+          'i': { en: 'Innings break', hi: 'Innings break', ta: 'Innings break' },
+          'p': { en: 'Player injured', hi: 'Khiladi chotil', ta: 'Player injured' },
+          'd': { en: 'Drizzle', hi: 'Baarish', ta: 'Drizzle' },
+          // Wickets
+          '^1': { en: 'Bowled', hi: 'Bowled ho gaye', ta: 'Bowled' },
+          '^2': { en: 'Caught Out', hi: 'Catch out', ta: 'Caught Out' },
+          '^3': { en: 'Caught and bowled', hi: 'Caught and bowled', ta: 'Caught and bowled' },
+          '^4': { en: 'Run Out', hi: 'Run out', ta: 'Run Out' },
+          '^5': { en: 'LBW', hi: 'LBW out', ta: 'LBW' },
+          '^6': { en: 'Hit Wicket', hi: 'Hit wicket', ta: 'Hit Wicket' },
+          '^7': { en: 'Caught Behind', hi: 'Caught behind', ta: 'Caught Behind' },
+          '^8': { en: 'Stumped', hi: 'Stump out', ta: 'Stumped' },
+          '^9': { en: 'Mankaded', hi: 'Mankading out', ta: 'Mankaded' },
+          '^10': { en: 'Obstructing the field', hi: 'Obstructing the field', ta: 'Obstructing the field' },
+          '^11': { en: 'Retired Hurt', hi: 'Retired hurt', ta: 'Retired Hurt' },
+          '^12': { en: 'Retired Out', hi: 'Retired out', ta: 'Retired Out' },
+          '^13': { en: 'Absent Hurt', hi: 'Absent hurt', ta: 'Absent Hurt' },
+          '^14': { en: 'Timed Out', hi: 'Timed out', ta: 'Timed Out' },
+        };
+
         if (isNewOver) {
           if (lang === 'hi') textToSpeak = `${overNum}ve over ki ${getOrdinal(ballNum, 'hi')} ball`;
           else if (lang === 'ta') textToSpeak = `${overNum} vadhu over in ${getOrdinal(ballNum, 'ta')} pandhu`;
           else textToSpeak = `${getOrdinal(ballNum, 'en')} ball of the ${overNum}th over`;
+        } else if (TTS_MAP[lowerBall]) {
+          textToSpeak = TTS_MAP[lowerBall][lang] || TTS_MAP[lowerBall]['en'];
         } else if (lowerBall === '4') {
           textToSpeak = lang === 'hi' ? 'chauka aaya chauka' : lang === 'ta' ? 'four, nangu rangal' : 'four runs';
         } else if (lowerBall === '6') {
           textToSpeak = lang === 'hi' ? 'chhakka aaya chhakka' : lang === 'ta' ? 'six, aaru rangal' : 'six runs';
         } else if (lowerBall === 'w') {
           textToSpeak = lang === 'hi' ? 'wicket aaya wicket' : lang === 'ta' ? 'wicket, out' : 'wicket falls';
-        } else if (lowerBall === 'wd') {
-          textToSpeak = lang === 'hi' ? 'wide ball' : lang === 'ta' ? 'wide pandhu' : 'wide ball';
-        } else if (lowerBall === 'nb') {
-          textToSpeak = 'no ball';
-        } else if (lowerBall === 'lb') {
-          textToSpeak = 'leg bye';
-        } else if (lowerBall === '1' || lowerBall === '2' || lowerBall === '3' || lowerBall === '5') {
+        } else if (lowerBall.startsWith('wd')) {
+          const runs = lowerBall.replace('wd', '');
+          const runsText = runs ? ` plus ${runs} run${runs !== '1' ? 's' : ''}` : '';
+          textToSpeak = lang === 'hi' ? `wide ball${runsText}` : lang === 'ta' ? `wide pandhu${runsText}` : `wide ball${runsText}`;
+        } else if (lowerBall.startsWith('nb')) {
+          const runs = lowerBall.replace('nb', '');
+          const runsText = runs ? ` plus ${runs} run${runs !== '1' ? 's' : ''}` : '';
+          textToSpeak = `no ball${runsText}`;
+        } else if (lowerBall.startsWith('lb') && lowerBall !== 'lbw') {
+          const runs = lowerBall.replace('lb', '');
+          const runsText = runs ? ` ${runs} run${runs !== '1' ? 's' : ''}` : '';
+          textToSpeak = `leg bye${runsText}`;
+        } else if (lowerBall.startsWith('by')) {
+          const runs = lowerBall.replace('by', '');
+          const runsText = runs ? ` ${runs} run${runs !== '1' ? 's' : ''}` : '';
+          textToSpeak = `bye${runsText}`;
+        } else if (['1', '2', '3', '5'].includes(lowerBall)) {
           textToSpeak = lang === 'en' ? `${lowerBall} run${lowerBall !== '1' ? 's' : ''}` : `${lowerBall} run`;
         } else if (lowerBall === '0') {
           textToSpeak = lang === 'hi' ? 'dot ball zero run' : lang === 'ta' ? 'dot ball, zero run' : 'dot ball, no run';

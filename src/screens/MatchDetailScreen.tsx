@@ -179,44 +179,77 @@ const resolveSquad = (squads: any[], teamObj: any, fallbackIndex: 0 | 1) => {
 };
 
 const BALL_EVENT_MAP: Record<string, string> = {
-    // Ball Events
-    'b': 'Ball',   // Ball
-    'B': 'Ball',   // Ball
+    // 1. Single Letter/Short Codes
+    'b': 'Ball',
     'o': 'Over',
     'w': 'Wicket',
-    'nb': 'No Ball',
+    'f': 'Fast Bowler',
+    's': 'Spin Bowler',
+    'e': 'Players Entering',
+    'a': 'Appeal',
+    'i': 'Innings Break',
+    'p': 'Player Injured',
+    'd': 'Drizzle',
+
+    // 2. Wide Ball Codes
     'wd': 'Wide',
-    'lb': 'Leg Bye',
-    'by': 'Bye',
-    'fh': 'Free Hit',
-
-    // No Ball Combinations
-    'nb1': 'NB + 1 Run',
-    'nb2': 'NB + 2 Runs',
-    'nb4': 'NB + 4 Runs',
-    'nb6': 'NB + 6 Runs',
-
-    // Wide Combinations
     'wd1': 'Wide + 1 Run',
     'wd2': 'Wide + 2 Runs',
+    'wd3': 'Wide + 3 Runs',
     'wd4': 'Wide + 4 Runs',
+    'wd5': 'Wide + 5 Runs',
+    'wd6': 'Wide + 6 Runs',
 
-    // Wicket Types
-    '^1': 'Bowled',
-    '^2': 'Caught',
-    '^4': 'Run Out',
-    '^5': 'LBW',
-    '^8': 'Stumped',
+    // 3. No Ball Codes
+    'nb': 'No Ball',
+    'nb1': 'No Ball + 1 Run',
+    'nb2': 'No Ball + 2 Runs',
+    'nb3': 'No Ball + 3 Runs',
+    'nb4': 'No Ball + 4 Runs',
+    'nb5': 'No Ball + 5 Runs',
+    'nb6': 'No Ball + 6 Runs',
 
-    // Other Events
+    // 4. Bye and Leg Bye Codes
+    'by1': 'Bye Single',
+    'by2': 'Bye Double',
+    'by3': 'Bye Triple',
+    'by4': 'Bye Four',
+    'lb': 'Leg By',
+    'lb1': 'Leg By Single',
+    'lb2': 'Leg By Double',
+    'lb3': 'Leg By Triple',
+    'lb4': 'Leg By Four',
+
+    // 5. Special Event Codes
+    'fh': 'Free Hit',
     'cd': 'Catch Drop',
     'cc': 'Covers Coming',
     'ba': 'Ball In Air',
+    'no': 'Not out',
     'tu': 'Third Umpire',
-    'no': 'Not Out',
-    'i': 'Innings Break',
-    'p': 'Player Injured',
-    'd': 'Drizzle / Declared',
+    'u': 'Third Umpire',
+    'ruka': 'Bowler Stopped',
+
+    // 6. Wicket Type Codes
+    '^1': 'Bowled',
+    '^2': 'Caught Out',
+    '^3': 'Caught and bowled',
+    '^4': 'Run Out',
+    '^5': 'LBW Out',
+    '^6': 'Hit Wicket',
+    '^7': 'Caught Behind',
+    '^8': 'Stumped Out',
+    '^9': 'Mankaded',
+    '^10': 'Obst. the field',
+    '^11': 'Retired Hurt',
+    '^12': 'Retired Out',
+    '^13': 'Absent Hurt',
+    '^14': 'Timed Out',
+
+    // 7. Break Codes (mapped directly just in case)
+    '/0': 'Lunch Break',
+    '/1': 'Tea Break',
+    '/2': 'Stumps',
 };
 
 const getBallDisplayText = (val: string) => {
@@ -413,7 +446,8 @@ const CommentaryTab = ({ matchId }: { matchId: string }) => {
         dispatch(fetchCommentary({ matchId, page: 1, limit: currentLimit, ...params })).then((res: any) => {
             if (res.payload?.data?.length < currentLimit) setHasMore(false);
         });
-    }, [dispatch, matchId, activeFilter, getBackendFilter]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dispatch, matchId, activeFilter]); // removed getBackendFilter to prevent infinite reload on liveStatus update
 
     const loadMore = useCallback(() => {
         const currentLimit = activeFilter === 'Overs' ? 30 : 20;
@@ -427,7 +461,8 @@ const CommentaryTab = ({ matchId }: { matchId: string }) => {
                 }
             });
         }
-    }, [dispatch, matchId, page, activeFilter, hasMore, refreshing.commentary, loading.commentary, reduxCommentary.length, getBackendFilter]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dispatch, matchId, page, activeFilter, hasMore, refreshing.commentary, loading.commentary, reduxCommentary.length]); // removed getBackendFilter
 
     useEffect(() => {
         dispatch(clearCommentary());
@@ -438,7 +473,8 @@ const CommentaryTab = ({ matchId }: { matchId: string }) => {
         dispatch(fetchCommentary({ matchId, page: 1, limit: currentLimit, ...params })).then((res: any) => {
             if (res.payload?.data?.length < currentLimit) setHasMore(false);
         });
-    }, [activeFilter, matchId, dispatch, getBackendFilter]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeFilter, matchId, dispatch]); // removed getBackendFilter to prevent reloading every ball
 
     const processedCommentary = useMemo(() => {
         if (reduxCommentary.length > 0) {
@@ -454,20 +490,49 @@ const CommentaryTab = ({ matchId }: { matchId: string }) => {
             const ballInOv = item.ballInOver || item.ball_in_over || 0;
             
             let calculatedIndex = '0.0';
-            if (ballNum > 0) {
+            
+            // If the backend gave us an explicit string like "44.1" (e.g. in `overs` or `over_str`)
+            if (item.overs && typeof item.overs === 'string' && item.overs.includes('.')) {
+                calculatedIndex = item.overs;
+            } else if (item.over_str && typeof item.over_str === 'string' && item.over_str.includes('.')) {
+                calculatedIndex = item.over_str;
+            } else if (item.ballLabel && typeof item.ballLabel === 'string' && /^\d+\.\d+$/.test(item.ballLabel)) {
+                // Sometimes ballLabel contains the index "44.1" instead of the outcome "W"
+                calculatedIndex = item.ballLabel;
+            } else if (ballNum > 0) {
                 const over = Math.floor((ballNum - 1) / 6) + 1;
                 const ball = (ballNum - 1) % 6 + 1;
                 calculatedIndex = `${over - 1}.${ball}`;
             } else if (overNum > 0) {
                 // If we have overNumber, try to use ballInOver for the fraction
-                const fraction = ballInOv > 0 ? ballInOv : '0';
+                let fraction = ballInOv > 0 ? ballInOv : '0';
+                
+                // Fallback: If this is a socket event and we don't have the fraction,
+                // we might try to guess it from liveStatus if it's the very latest ball,
+                // but for now, we'll just show the over number if fraction is missing.
                 calculatedIndex = `${overNum - 1}.${fraction}`;
+            }
+
+            // Decide what to show inside the circular bubble (W, 4, 6, wd)
+            let result = item.ballLabel || item.runs?.toString() || '0';
+            
+            // If ballLabel was the index (e.g. "44.1"), then we shouldn't show "44.1" in the bubble!
+            if (/^\d+\.\d+$/.test(result)) {
+                if (item.isWicket || item.type === 'wicket' || item.type === 'w') {
+                    result = 'W';
+                } else if (item.extras && item.extras > 0) {
+                    result = item.ballType || 'wd'; // fallback to ballType if available
+                } else if (item.runs !== undefined) {
+                    result = item.runs.toString();
+                } else {
+                    result = '-';
+                }
             }
 
             return {
                 ...item,
                 calculatedIndex,
-                calculatedResult: item.ballLabel || item.runs?.toString() || '0'
+                calculatedResult: result
             };
         });
 
