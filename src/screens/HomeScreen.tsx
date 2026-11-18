@@ -20,6 +20,9 @@ import { spacing, fontSize, borderRadius, scale, elevation } from "../theme";
 import { Card } from "../components/ui/Card";
 import { Text as ThemedText } from "../components/ui/Text";
 import { MatchService } from "../services/match.service";
+import { SeriesService } from "../services/series.service";
+import { ContentService } from "../services/content.service";
+import { formatLabelFromApi } from "../utils/score";
 import { useFetch } from "../hooks/useFetch";
 import { useLiveMatches } from "../hooks/useLiveMatches";
 import LogoSVG from '../../assets/cp-nobg-logo.svg';
@@ -27,94 +30,6 @@ import { mergeTeamScore, mergeTeamOvers } from '../utils/score';
 
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-
-// Mock data
-const topNews = [
-  {
-    id: "1",
-    title: "India wins World Cup Final",
-    summary: "Historic victory at Wankhede Stadium",
-    image: "🏆",
-  },
-  {
-    id: "2",
-    title: "Kohli breaks batting record",
-    summary: "New milestone in international cricket",
-    image: "🏏",
-  },
-  {
-    id: "3",
-    title: "IPL 2024 auction updates",
-    summary: "Major signings and surprises",
-    image: "💰",
-  },
-  {
-    id: "4",
-    title: "Australia tour announced",
-    summary: "Five-match series scheduled",
-    image: "🇦🇺",
-  },
-  {
-    id: "5",
-    title: "New cricket stadium opens",
-    summary: "State-of-the-art facility unveiled",
-    image: "🏟️",
-  },
-];
-
-const liveMatchesData = [
-  {
-    id: "1",
-    team1: "IND",
-    team2: "AUS",
-    score1: "287/4",
-    score2: "180/6",
-    status: "Live",
-  },
-  {
-    id: "2",
-    team1: "ENG",
-    team2: "PAK",
-    score1: "156/7",
-    score2: "89/3",
-    status: "Live",
-  },
-  {
-    id: "3",
-    team1: "SA",
-    team2: "NZ",
-    score1: "245/8",
-    score2: "198/5",
-    status: "Live",
-  },
-];
-
-const newsCards = [
-  {
-    id: "1",
-    title: "Cricket World Cup 2024 Schedule Released",
-    time: "2 hours ago",
-    category: "Tournament",
-  },
-  {
-    id: "2",
-    title: "Player Transfers: Major Signings This Season",
-    time: "4 hours ago",
-    category: "Transfers",
-  },
-  {
-    id: "3",
-    title: "New Rules Announced for T20 Format",
-    time: "6 hours ago",
-    category: "Rules",
-  },
-  {
-    id: "4",
-    title: "Stadium Capacity Increased for Finals",
-    time: "8 hours ago",
-    category: "Venues",
-  },
-];
 
 export const HomeScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
@@ -133,6 +48,35 @@ export const HomeScreen: React.FC = () => {
     const res = await MatchService.getMatches({ status: 'live', limit: 10 });
     return res;
   }, []);
+
+  // Featured series for the hero carousel (real data, replaces placeholder headlines)
+  const { data: featuredRaw } = useFetch(async () => {
+    const res: any = await SeriesService.getSeries({ onHome: true, limit: 5 });
+    return Array.isArray(res?.result) ? res.result : [];
+  }, []);
+  const topNews: any[] = featuredRaw && featuredRaw.length > 0
+    ? featuredRaw.map((s: any) => ({
+        id: s._id,
+        title: s.name,
+        summary: [s.startDate && new Date(s.startDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }), s.endDate && new Date(s.endDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })].filter(Boolean).join(' – ') + (s.activeFormat ? ` • ${formatLabelFromApi(s.activeFormat)}` : ''),
+        image: '🏆',
+      }))
+    : [{ id: 'welcome', title: 'Cricket Pulse', summary: 'Live scores, scorecards and commentary', image: '🏏' }];
+
+  // Latest news (editorial CMS); the section hides itself when there is none
+  const { data: latestNews } = useFetch(async () => (await ContentService.getNews({ limit: 4 })).result, []);
+
+  // Recent results for the lower section (real data)
+  const { data: recentResults } = useFetch(
+    () => MatchService.getMatches({ status: 'completed', direction: 'past', limit: 5 }),
+    [],
+  );
+  const newsCards: any[] = (recentResults || []).map((m: any) => ({
+    id: m.id || m._id,
+    title: `${m.team1?.name || 'Team 1'} vs ${m.team2?.name || 'Team 2'}`,
+    time: m.result || m.series || '',
+    category: formatLabelFromApi(m.format),
+  }));
 
   // Live socket updates for the listing screen
   const { liveUpdates, isConnected: socketConnected } = useLiveMatches();
@@ -190,10 +134,10 @@ export const HomeScreen: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const renderNewsItem = ({ item }: { item: (typeof topNews)[0] }) => (
+  const renderNewsItem = ({ item }: { item: any }) => (
     <TouchableOpacity
       activeOpacity={0.9}
-      onPress={() => navigation.navigate('NewsDetail', { newsId: item.id })}
+      onPress={() => item.id !== 'welcome' && navigation.navigate('SeriesDetail', { seriesId: item.id })}
       style={styles.newsItem}
     >
       <LinearGradient
@@ -265,15 +209,15 @@ export const HomeScreen: React.FC = () => {
     );
   };
 
-  const renderNewsCard = ({ item }: { item: (typeof newsCards)[0] }) => (
+  const renderNewsCard = ({ item }: { item: any }) => (
     <TouchableOpacity
       activeOpacity={0.8}
-      onPress={() => navigation.navigate('NewsDetail', { newsId: item.id })}
+      onPress={() => navigation.navigate('MatchDetails', { matchId: item.id })}
     >
       <Card style={styles.newsCard}>
         <View style={styles.newsCardImageContainer}>
           <View style={styles.newsCardImage}>
-            <ThemedText style={styles.newsCardEmoji}>📰</ThemedText>
+            <ThemedText style={styles.newsCardEmoji}>🏏</ThemedText>
           </View>
         </View>
         <View style={styles.newsCardContent}>
@@ -438,7 +382,32 @@ export const HomeScreen: React.FC = () => {
             )}
           </View>
 
-          {/* News Section */}
+          {/* Latest News */}
+          {latestNews && latestNews.length > 0 && (
+            <View style={styles.section}>
+              <View style={[styles.sectionHeader, { paddingHorizontal: spacing.lg }]}>
+                <ThemedText variant="title" weight="semibold" style={styles.sectionTitle}>Latest News</ThemedText>
+                <TouchableOpacity onPress={() => navigation.navigate('AllNews')}>
+                  <ThemedText style={[styles.viewAllText, { color: theme.primary }]}>View All <Ionicons name="chevron-forward" size={14} color={theme.primary} /></ThemedText>
+                </TouchableOpacity>
+              </View>
+              {latestNews.map((n: any) => (
+                <TouchableOpacity key={n._id} activeOpacity={0.8} onPress={() => navigation.navigate('NewsDetail', { newsId: n._id })}>
+                  <Card style={styles.newsCard}>
+                    <View style={styles.newsCardContent}>
+                      <View style={[styles.categoryBadge, { backgroundColor: theme.primary + "20" }]}>
+                        <ThemedText style={[styles.categoryText, { color: theme.primary }]}>{String(n.category).replace(/-/g, ' ')}</ThemedText>
+                      </View>
+                      <ThemedText variant="body" weight="semibold" style={styles.newsCardTitle}>{n.title}</ThemedText>
+                      {n.summary ? <ThemedText color="textSecondary" variant="small" numberOfLines={2}>{n.summary}</ThemedText> : null}
+                    </View>
+                  </Card>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* Recent results */}
           <View style={styles.section}>
             <View style={[styles.sectionHeader, { paddingHorizontal: spacing.lg }]}>
               <ThemedText
@@ -446,15 +415,19 @@ export const HomeScreen: React.FC = () => {
                 weight="semibold"
                 style={styles.sectionTitle}
               >
-                News
+                Recent Results
               </ThemedText>
-              <TouchableOpacity onPress={() => navigation.navigate('AllNews')}>
+              <TouchableOpacity onPress={() => navigation.navigate('Main', { screen: 'Matches' })}>
                 <ThemedText style={[styles.viewAllText, { color: theme.primary }]}>View All <Ionicons name="chevron-forward" size={14} color={theme.primary} /></ThemedText>
               </TouchableOpacity>
             </View>
-            {newsCards.map((item) => (
-              <View key={item.id}>{renderNewsCard({ item })}</View>
-            ))}
+            {newsCards.length === 0 ? (
+              <View style={{ padding: 16, alignItems: 'center' }}>
+                <ThemedText color="textSecondary">No completed matches yet</ThemedText>
+              </View>
+            ) : (
+              newsCards.map((item) => <View key={item.id}>{renderNewsCard({ item })}</View>)
+            )}
           </View>
         </ScrollView>
       </Animated.View>
@@ -647,8 +620,8 @@ const styles = StyleSheet.create({
   },
   // Live Match Cards
   liveMatchCard: {
-    width: 160,
-    height: 80,
+    width: 170,
+    minHeight: 80, // grows with the user's font size instead of clipping the scores
     marginRight: spacing.md,
     padding: spacing.sm,
     borderRadius: borderRadius.md,

@@ -14,6 +14,7 @@ import { AppState } from 'react-native';
 import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
 import { SOCKET_URL } from '../services/socketClient';
+import { fetchLiveStatus } from '../store/matchSlice';
 import {
   updateLiveStatusFromSocket,
   updateInningFromSocket,
@@ -317,15 +318,21 @@ export function useLiveMatch(matchId: string | null): UseLiveMatchReturn {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 2000,
-      reconnectionAttempts: 10,
+      reconnectionDelayMax: 10000,
+      // Mobile networks drop constantly; never give up reconnecting (it used to stop after 10 tries)
+      reconnectionAttempts: Infinity,
     });
 
     socketRef.current = socket;
 
+    let connectedBefore = false;
     socket.on('connect', () => {
       console.log('[useLiveMatch] Connected:', socket.id);
       setIsConnected(true);
       socket.emit('join_match', { matchId });
+      // After a reconnect we may have missed balls while offline: resync from REST
+      if (connectedBefore) (dispatch as any)(fetchLiveStatus(matchId));
+      connectedBefore = true;
     });
 
     socket.on('disconnect', (reason) => {
@@ -521,7 +528,7 @@ export function useLiveMatch(matchId: string | null): UseLiveMatchReturn {
     });
 
     socket.on('connect_error', (err) => {
-      console.warn('[useLiveMatch] Connection error (make sure ngrok is active):', err.message);
+      console.warn('[useLiveMatch] Connection error:', err.message);
     });
 
     socket.on('reconnect_attempt', (attempt) => {

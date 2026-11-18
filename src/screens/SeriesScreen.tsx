@@ -37,14 +37,7 @@ interface Series {
     isActive?: boolean;
 }
 
-const MOCK_SERIES: Series[] = [
-    { id: '1', name: 'ICC World Cup 2024', date: 'Oct 5 - Nov 19', matches: 48, image: '🏆', month: 'October 2024', type: 'international', isActive: true },
-    { id: '2', name: 'Big Bash League', date: 'Oct 15 - Jan 24', matches: 61, image: '⚡', month: 'October 2024', type: 'leagues', isActive: false },
-    { id: '3', name: 'India vs Australia', date: 'Nov 22 - Jan 7', matches: 5, image: '🏏', month: 'November 2024', type: 'international', isActive: true },
-    { id: '4', name: 'Indian Premier League', date: 'Nov 25 - Dec 20', matches: 74, image: '🎯', month: 'November 2024', type: 'domestic', isActive: false },
-    { id: '5', name: 'Pakistan Super League', date: 'Dec 17 - Jan 18', matches: 34, image: '🌟', month: 'December 2024', type: 'leagues', isActive: true },
-    { id: '6', name: 'England vs New Zealand', date: 'Dec 5 - Dec 15', matches: 3, image: '🏴', month: 'December 2024', type: 'international', isActive: false },
-];
+
 
 const TopTab = createMaterialTopTabNavigator<TopTabParamList>();
 
@@ -109,7 +102,7 @@ const SeriesList = () => {
                     placeholderTextColor={theme.textSecondary}
                     value={search}
                     onChangeText={setSearch}
-                    allowFontScaling={false}
+                    maxFontSizeMultiplier={1.3}
                 />
             </View>
 

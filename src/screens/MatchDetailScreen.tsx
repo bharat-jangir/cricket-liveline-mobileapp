@@ -53,6 +53,7 @@ import { setLanguage, toggleMute } from '../store/appSlice';
 import * as Speech from 'expo-speech';
 import { MatchDetailSkeleton, ScorecardBodySkeleton } from '../components/MatchDetailSkeleton';
 import { SessionsTable } from '../components/SessionsTable';
+import { matchBallsPerOver, ballsPerOverOf, isHundredMatch } from '../utils/score';
 import { RefreshControl } from 'react-native';
 
 // --- Helper Components ---
@@ -500,8 +501,9 @@ const CommentaryTab = ({ matchId }: { matchId: string }) => {
                 // Sometimes ballLabel contains the index "44.1" instead of the outcome "W"
                 calculatedIndex = item.ballLabel;
             } else if (ballNum > 0) {
-                const over = Math.floor((ballNum - 1) / 6) + 1;
-                const ball = (ballNum - 1) % 6 + 1;
+                const bpo = matchBallsPerOver.value;
+                const over = Math.floor((ballNum - 1) / bpo) + 1;
+                const ball = (ballNum - 1) % bpo + 1;
                 calculatedIndex = `${over - 1}.${ball}`;
             } else if (overNum > 0) {
                 // If we have overNumber, try to use ballInOver for the fraction
@@ -827,8 +829,9 @@ const CommentaryTab = ({ matchId }: { matchId: string }) => {
                                 // Calculate chronological or index-based ball index
                                 let ballIndexText = `${selectedOver.overNumber - 1}.${index + 1}`;
                                 if (ball.ballNumber) {
-                                    const over = Math.floor((ball.ballNumber - 1) / 6) + 1;
-                                    const b = (ball.ballNumber - 1) % 6 + 1;
+                                    const bpo = matchBallsPerOver.value;
+                                    const over = Math.floor((ball.ballNumber - 1) / bpo) + 1;
+                                    const b = (ball.ballNumber - 1) % bpo + 1;
                                     ballIndexText = `${over - 1}.${b}`;
                                 }
 
@@ -1267,7 +1270,7 @@ const ScoreSummaryHeader = ({ liveStatus, match, isConnected }: { liveStatus: an
                             {isCompleted && t1Innings.map((inn: any, idx: number) => (
                                 <ThemedText key={idx} weight={idx === t1Innings.length - 1 ? "bold" : "medium"} color="white" style={{ fontSize: idx === t1Innings.length - 1 ? 15 : 12, opacity: idx === t1Innings.length - 1 ? 1 : 0.7 }}>
                                     {inn.totalRuns}-{inn.totalWickets}
-                                    {idx === t1Innings.length - 1 && <ThemedText variant="caption" color="white" style={{ opacity: 0.6 }}> ({inn.totalOvers || Math.floor((inn.totalBalls || 0) / 6)})</ThemedText>}
+                                    {idx === t1Innings.length - 1 && <ThemedText variant="caption" color="white" style={{ opacity: 0.6 }}> ({isHundredMatch(match, liveStatus) ? `${inn.totalBalls || 0}b` : (inn.totalOvers || Math.floor((inn.totalBalls || 0) / ballsPerOverOf(match, liveStatus)))})</ThemedText>}
                                 </ThemedText>
                             ))}
                         </View>
@@ -1294,7 +1297,7 @@ const ScoreSummaryHeader = ({ liveStatus, match, isConnected }: { liveStatus: an
                             {isCompleted && t2Innings.map((inn: any, idx: number) => (
                                 <ThemedText key={idx} weight={idx === t2Innings.length - 1 ? "bold" : "medium"} color="white" style={{ textAlign: 'right', fontSize: idx === t2Innings.length - 1 ? 15 : 12, opacity: idx === t2Innings.length - 1 ? 1 : 0.7 }}>
                                     {inn.totalRuns}-{inn.totalWickets}
-                                    {idx === t2Innings.length - 1 && <ThemedText variant="caption" color="white" style={{ opacity: 0.6 }}> ({inn.totalOvers || Math.floor((inn.totalBalls || 0) / 6)})</ThemedText>}
+                                    {idx === t2Innings.length - 1 && <ThemedText variant="caption" color="white" style={{ opacity: 0.6 }}> ({isHundredMatch(match, liveStatus) ? `${inn.totalBalls || 0}b` : (inn.totalOvers || Math.floor((inn.totalBalls || 0) / ballsPerOverOf(match, liveStatus)))})</ThemedText>}
                                 </ThemedText>
                             ))}
                         </View>
@@ -2769,6 +2772,8 @@ export const MatchDetailScreen: React.FC = () => {
         recentOvers: recentOversData,
         sessions: sessionsData
     } = useAppSelector(state => state.match);
+    // Child tabs format "over.ball" using the match's real over length (5 for The Hundred)
+    matchBallsPerOver.value = ballsPerOverOf(match, liveStatus);
 
     // 1. Initial Load: Fetch essentials for the initial view (Header + Score + Active Players)
     useEffect(() => {

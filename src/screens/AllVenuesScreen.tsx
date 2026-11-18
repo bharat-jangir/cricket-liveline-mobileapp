@@ -105,7 +105,7 @@ export const AllVenuesScreen: React.FC = () => {
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                         autoCorrect={false}
-                        allowFontScaling={false}
+                        maxFontSizeMultiplier={1.3}
                     />
                     {searchQuery.length > 0 && (
                         <TouchableOpacity onPress={() => setSearchQuery('')}>

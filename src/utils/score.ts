@@ -123,3 +123,27 @@ export function mergeTeamOvers(
   restParts[restParts.length - 1] = socketStr;
   return restParts.join(' & ');
 }
+
+/**
+ * Balls per over for a match. The Hundred is played in 5-ball sets; everything else uses the
+ * match setting (default 6). Child components that format "over.ball" read `matchBallsPerOver.value`.
+ */
+export const matchBallsPerOver = { value: 6 };
+
+export function ballsPerOverOf(match: any, liveStatus?: any): number {
+  const fmt = String(liveStatus?.format || match?.matchFormat || '').toLowerCase();
+  if (fmt === 'hundred' || fmt === '100b') return 5;
+  const n = Number(liveStatus?.ballsPerOver || match?.ballsPerOver);
+  return n > 0 ? n : 6;
+}
+
+export function isHundredMatch(match: any, liveStatus?: any): boolean {
+  const fmt = String(liveStatus?.format || match?.matchFormat || '').toLowerCase();
+  return fmt === 'hundred' || fmt === '100b';
+}
+
+const FORMAT_NAMES: Record<string, string> = { T20: 'T20', T20I: 'T20I', ODI: 'ODI', TEST: 'Test', T10: 'T10', HUNDRED: 'The Hundred', '100B': 'The Hundred' };
+export function formatLabelFromApi(f?: string): string {
+  const k = String(f || '').toUpperCase();
+  return FORMAT_NAMES[k] || k || 'Match';
+}

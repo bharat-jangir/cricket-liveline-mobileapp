@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, Image, SafeAreaView, ActivityIndicator, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -7,7 +7,10 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../theme/ThemeContext';
 import { spacing, borderRadius } from '../theme';
 import { Text as ThemedText } from '../components/ui/Text';
-import { mockPlayers, Player } from '../data/mockData';
+import { PlayerService } from '../services/player.service';
+import { useDebounce } from '../hooks/useDebounce';
+
+interface Player { _id: string; name: string; country?: string; role?: string; image?: string }
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 type RoleFilter = 'All' | 'Batsman' | 'Bowler' | 'All-Rounder';
@@ -20,30 +23,42 @@ export const AllPlayersScreen: React.FC = () => {
 
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedRole, setSelectedRole] = useState<RoleFilter>('All');
+    const [players, setPlayers] = useState<Player[]>([]);
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const [error, setError] = useState(false);
+    const debounced = useDebounce(searchQuery.trim(), 350);
+    const requestId = useRef(0);
 
-    const filteredPlayers = useMemo(() => {
-        let players = mockPlayers;
+    const ROLE_PARAM: Record<RoleFilter, string | undefined> = {
+        All: undefined, Batsman: 'batsman', Bowler: 'bowler', 'All-Rounder': 'all-rounder',
+    };
 
-        if (selectedRole !== 'All') {
-            players = players.filter(p => p.role === selectedRole);
+    const load = useCallback(async (nextPage: number) => {
+        const id = ++requestId.current;
+        nextPage === 1 ? setLoading(true) : setIsLoadingMore(true);
+        try {
+            const res = await PlayerService.getPlayers({ search: debounced || undefined, role: ROLE_PARAM[selectedRole], page: nextPage, limit: 20 });
+            if (id !== requestId.current) return; // a newer request superseded this one
+            setPlayers(prev => (nextPage === 1 ? res.result : [...prev, ...res.result]));
+            setPage(nextPage);
+            setHasMore(!!res.pagination && res.pagination.page < res.pagination.totalPages);
+            setError(false);
+        } catch {
+            if (id === requestId.current) setError(true);
+        } finally {
+            if (id === requestId.current) { setLoading(false); setIsLoadingMore(false); }
         }
+    }, [debounced, selectedRole]);
 
-        if (searchQuery) {
-            const lowerQuery = searchQuery.toLowerCase();
-            players = players.filter(p =>
-                p.name.toLowerCase().includes(lowerQuery) ||
-                p.country.toLowerCase().includes(lowerQuery)
-            );
-        }
-        return players;
-    }, [searchQuery, selectedRole]);
+    useEffect(() => { load(1); }, [load]);
 
     const handleLoadMore = useCallback(() => {
-        if (isLoadingMore || searchQuery.length > 0) return;
-        setIsLoadingMore(true);
-        setTimeout(() => setIsLoadingMore(false), 1500);
-    }, [isLoadingMore, searchQuery]);
+        if (isLoadingMore || loading || !hasMore) return;
+        load(page + 1);
+    }, [isLoadingMore, loading, hasMore, page, load]);
 
     const renderFooter = () => {
         if (!isLoadingMore) return null;
@@ -57,15 +72,21 @@ export const AllPlayersScreen: React.FC = () => {
     const renderPlayerCard = ({ item }: { item: Player }) => (
         <TouchableOpacity
             style={[styles.playerCard, { backgroundColor: theme.card, borderColor: theme.border }]}
-            onPress={() => navigation.navigate('PlayerProfile', { playerId: item.id })}
+            onPress={() => navigation.navigate('PlayerProfile', { playerId: item._id })}
             activeOpacity={0.8}
         >
             <View style={styles.cardHeader}>
-                <Image
-                    source={{ uri: item.image }}
-                    style={[styles.playerImage, { backgroundColor: isDark ? theme.border : '#f0f0f0' }]}
-                    resizeMode="cover"
-                />
+                {item.image ? (
+                    <Image
+                        source={{ uri: item.image }}
+                        style={[styles.playerImage, { backgroundColor: isDark ? theme.border : '#f0f0f0' }]}
+                        resizeMode="cover"
+                    />
+                ) : (
+                    <View style={[styles.playerImage, { backgroundColor: isDark ? theme.border : '#e2e8f0', alignItems: 'center', justifyContent: 'center' }]}>
+                        <ThemedText weight="bold" color="textSecondary">{(item.name || '?').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}</ThemedText>
+                    </View>
+                )}
                 <View style={styles.playerInfo}>
                     <ThemedText variant="subtitle" weight="bold" numberOfLines={1}>
                         {item.name}
@@ -75,7 +96,7 @@ export const AllPlayersScreen: React.FC = () => {
                     </ThemedText>
                     <View style={[styles.roleBadge, { backgroundColor: theme.primary + '15' }]}>
                         <ThemedText variant="caption" color="primary" weight="semibold">
-                            {item.role}
+                            {String(item.role || '').replace(/-/g, ' ')}
                         </ThemedText>
                     </View>
                 </View>
@@ -106,7 +127,7 @@ export const AllPlayersScreen: React.FC = () => {
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                         autoCorrect={false}
-                        allowFontScaling={false}
+                        maxFontSizeMultiplier={1.3}
                     />
                     {searchQuery.length > 0 && (
                         <TouchableOpacity onPress={() => setSearchQuery('')}>
@@ -150,8 +171,8 @@ export const AllPlayersScreen: React.FC = () => {
 
             {/* Player Grid */}
             <FlatList
-                data={filteredPlayers}
-                keyExtractor={(item) => item.id}
+                data={players}
+                keyExtractor={(item) => item._id}
                 renderItem={renderPlayerCard}
                 numColumns={2}
                 columnWrapperStyle={styles.rowWrapper}
@@ -159,13 +180,24 @@ export const AllPlayersScreen: React.FC = () => {
                 showsVerticalScrollIndicator={false}
                 onEndReached={handleLoadMore}
                 onEndReachedThreshold={0.5}
-                ListFooterComponent={searchQuery ? undefined : renderFooter}
+                ListFooterComponent={renderFooter}
                 ListEmptyComponent={() => (
                     <View style={styles.emptyContainer}>
-                        <Ionicons name="people-outline" size={48} color={theme.border} />
-                        <ThemedText color="textSecondary" style={styles.emptyText}>
-                            No players found matching your criteria.
-                        </ThemedText>
+                        {loading ? (
+                            <ActivityIndicator size="small" color={theme.primary} />
+                        ) : (
+                            <>
+                                <Ionicons name={error ? 'cloud-offline-outline' : 'people-outline'} size={48} color={theme.border} />
+                                <ThemedText color="textSecondary" style={styles.emptyText}>
+                                    {error ? 'Could not load players. Pull back and try again.' : 'No players found matching your criteria.'}
+                                </ThemedText>
+                                {error && (
+                                    <TouchableOpacity onPress={() => load(1)} style={{ marginTop: spacing.md }}>
+                                        <ThemedText color="primary" weight="semibold">Retry</ThemedText>
+                                    </TouchableOpacity>
+                                )}
+                            </>
+                        )}
                     </View>
                 )}
             />

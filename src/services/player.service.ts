@@ -29,10 +29,15 @@ export interface PlayerStats {
 }
 
 export const PlayerService = {
+  getPlayers: async (params: { search?: string; role?: string; page?: number; limit?: number }) => {
+    const response = await apiClient.get('/app/players', { params });
+    const data = response.data?.data ?? response.data;
+    return { result: (data?.result ?? []) as any[], pagination: data?.pagination as { page: number; totalPages: number } | undefined };
+  },
+
   getPlayerDetails: async (playerId: string): Promise<PlayerProfile | null> => {
     try {
-      console.log(`[PlayerService] Fetching details for ID: ${playerId}`);
-      const response = await apiClient.get(`/players/${playerId}`);
+      const response = await apiClient.get(`/app/players/${playerId}`);
       const data = response.data;
 
       if (data && (data.status === false || data.success === false)) {
@@ -41,9 +46,7 @@ export const PlayerService = {
       }
 
       const result = data?.data?.result ?? data?.result ?? data?.data ?? data;
-      console.log(`[PlayerService] Extracted player result:`, result ? (result.name || result.fullName) : 'null');
       return result;
-      console.log("playerProfile=====>", result);
     } catch (error) {
       console.error(`[PlayerService] Error fetching player details:`, error);
       return null;
@@ -52,7 +55,7 @@ export const PlayerService = {
 
   getPlayerStats: async (playerId: string, format: string): Promise<PlayerStats | null> => {
     try {
-      const response = await apiClient.get(`/players/${playerId}/stats`, {
+      const response = await apiClient.get(`/app/players/${playerId}/stats`, {
         params: { format }
       });
       const data = response.data;
@@ -61,7 +64,6 @@ export const PlayerService = {
         return null;
       }
 
-      console.log("playerStats=====>", data);
       return data?.data?.result ?? data?.result ?? data?.data ?? data;
     } catch (error) {
       console.error(`[PlayerService] Error fetching player stats:`, error);

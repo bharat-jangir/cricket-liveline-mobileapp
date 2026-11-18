@@ -34,9 +34,7 @@ export const MatchService = {
   getMatchDetails: async (matchId: string) => {
     try {
       const response = await axiosInstance.get(`/app/matches/${matchId}`);
-      console.log('[MatchService.getMatchDetails] Raw response.data:', JSON.stringify(response.data).substring(0, 800));
       const result = response.data?.data?.result ?? response.data?.result ?? response.data?.data ?? response.data;
-      console.log('[MatchService.getMatchDetails] Extracted result keys:', result ? Object.keys(result) : 'null');
       return result;
     } catch (error) {
       console.error(`Error fetching match details for ${matchId}:`, error);
@@ -47,9 +45,7 @@ export const MatchService = {
   getLiveStatus: async (matchId: string) => {
     try {
       const response = await axiosInstance.get(`/app/matches/${matchId}/live-status`);
-      console.log('[MatchService.getLiveStatus] Raw response.data:', JSON.stringify(response.data).substring(0, 800));
       const result = response.data?.data?.result ?? response.data?.result ?? response.data?.data ?? response.data;
-      console.log('[MatchService.getLiveStatus] Extracted result keys:', result ? Object.keys(result) : 'null');
       return result;
     } catch (error) {
       console.error(`Error fetching live status for ${matchId}:`, error);
@@ -61,14 +57,6 @@ export const MatchService = {
     try {
       const response = await axiosInstance.get(`/app/matches/${matchId}/scorecard/${inningNumber}`);
       const result = response.data?.data?.result ?? response.data?.result ?? response.data;
-      
-      console.log(`[MatchService.getScorecard] Inning ${inningNumber} response:`);
-      if (result && result.batting) {
-        console.log(`  Batting: ${result.batting.map((p: any) => `${p.playerName || p.playerId?.name} (v:${p.isVisible})`).join(', ')}`);
-      }
-      if (result && result.bowling) {
-        console.log(`  Bowling: ${result.bowling.map((p: any) => `${p.playerName || p.playerId?.name} (v:${p.isVisible})`).join(', ')}`);
-      }
       
       return result;
     } catch (error) {
@@ -104,11 +92,9 @@ export const MatchService = {
     try {
       const response = await axiosInstance.get(`/app/matches/${matchId}/squads`);
       const raw = response.data;
-      console.log('[MatchService.getSquads] status:', raw?.statusCode, 'keys:', raw ? Object.keys(raw) : 'null');
       // successWithSingle wraps in { statusCode, data: { result: [...] } }
       const result = raw?.data?.result ?? raw?.result ?? raw?.data ?? raw;
       const arr = Array.isArray(result) ? result : [];
-      console.log('[MatchService.getSquads] squads count:', arr.length, arr.map((s: any) => s.teamId?.name));
       return arr;
     } catch (error) {
       console.error(`Error fetching squads for match ${matchId}:`, error);
@@ -118,7 +104,7 @@ export const MatchService = {
 
   getPointsTable: async (seriesId: string) => {
     try {
-      const response = await axiosInstance.get(`/points-tables?seriesId=${seriesId}`);
+      const response = await axiosInstance.get(`/app/series/${seriesId}/points-table`);
       // successWithPagination wraps in { statusCode, data: { result: [...] } }
       const result = response.data?.data?.result ?? response.data?.result ?? response.data?.data ?? response.data;
       return Array.isArray(result) ? result : [];

@@ -52,7 +52,9 @@ export function useLiveMatches(): UseLiveMatchesReturn {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 2000,
-      reconnectionAttempts: 10,
+      reconnectionDelayMax: 10000,
+      // Mobile networks drop constantly; never give up reconnecting (it used to stop after 10 tries)
+      reconnectionAttempts: Infinity,
     });
 
     socketRef.current = socket;

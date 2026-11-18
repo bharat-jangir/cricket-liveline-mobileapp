@@ -6,16 +6,25 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BASE_WIDTH = 375;
 const BASE_HEIGHT = 812;
 
-// Responsive scaling functions
+/** Largest OS font-size multiplier the UI is designed for (150% accessibility setting is capped at 130%). */
+export const MAX_FONT_SCALE = 1.3;
+
+const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
+const SHORT_SIDE = Math.min(SCREEN_WIDTH, SCREEN_HEIGHT);
+const LONG_SIDE = Math.max(SCREEN_WIDTH, SCREEN_HEIGHT);
+
+// Responsive scaling functions.
+// Based on the device's shorter/longer side (so rotation, split-screen and foldables don't flip the result)
+// and clamped, so small phones shrink a little and tablets don't blow every size up 2-3x.
+const RATIO = clamp(Math.min(SHORT_SIDE / BASE_WIDTH, LONG_SIDE / BASE_HEIGHT), 0.85, 1.25);
+const V_RATIO = clamp(LONG_SIDE / BASE_HEIGHT, 0.85, 1.25);
+
 export const scale = (size: number): number => {
-  const scaleWidth = SCREEN_WIDTH / BASE_WIDTH;
-  const scaleHeight = SCREEN_HEIGHT / BASE_HEIGHT;
-  const scale = Math.min(scaleWidth, scaleHeight);
-  return Math.ceil(PixelRatio.roundToNearestPixel(size * scale));
+  return Math.ceil(PixelRatio.roundToNearestPixel(size * RATIO));
 };
 
 export const verticalScale = (size: number): number => {
-  return Math.ceil(PixelRatio.roundToNearestPixel((size * SCREEN_HEIGHT) / BASE_HEIGHT));
+  return Math.ceil(PixelRatio.roundToNearestPixel(size * V_RATIO));
 };
 
 export const moderateScale = (size: number, factor: number = 0.5): number => {
@@ -39,7 +48,7 @@ export const spacing = {
 
 // Font sizes
 export const fontSize = {
-  xs: fontScale(10),
+  xs: fontScale(11), // 10 was below the readable minimum
   sm: fontScale(12),
   md: fontScale(14),
   lg: fontScale(16),

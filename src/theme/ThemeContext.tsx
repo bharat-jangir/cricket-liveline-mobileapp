@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { Appearance } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { lightTheme, darkTheme, Theme } from './index';
@@ -26,12 +26,14 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [language, setLanguageState] = useState('English');
   const [isOnboardingCompleted, setIsOnboardingCompleted] = useState(false);
   const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
+  // Follow the OS theme only until the user picks one explicitly
+  const hasUserTheme = useRef(false);
 
   useEffect(() => {
     loadSettings();
     
     const subscription = Appearance.addChangeListener(({ colorScheme }) => {
-      if (colorScheme) {
+      if (colorScheme && !hasUserTheme.current) {
         setIsDark(colorScheme === 'dark');
       }
     });
@@ -46,6 +48,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       const savedOnboarding = await AsyncStorage.getItem('isOnboardingCompleted');
       
       if (savedTheme !== null) {
+        hasUserTheme.current = true;
         setIsDark(savedTheme === 'dark');
       } else {
         const systemTheme = Appearance.getColorScheme();
@@ -84,11 +87,13 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
 
   const toggleTheme = () => {
     const newTheme = !isDark;
+    hasUserTheme.current = true;
     setIsDark(newTheme);
     saveTheme(newTheme ? 'dark' : 'light');
   };
 
   const setTheme = (dark: boolean) => {
+    hasUserTheme.current = true;
     setIsDark(dark);
     saveTheme(dark ? 'dark' : 'light');
   };

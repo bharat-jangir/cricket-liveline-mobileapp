@@ -1,22 +1,33 @@
 import axios, { InternalAxiosRequestConfig, AxiosError } from 'axios';
-
-// Pointing directly to main-app HTTP (port 5000 after env override) - firewall is already open for this port.
-// Use local IP for testing on physical devices or 10.0.2.2 for Android Emulator
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://58db-43-249-53-255.ngrok-free.app/api';
+import { API_URL, REQUEST_TIMEOUT_MS } from '../config';
 
 export const axiosInstance = axios.create({
   baseURL: API_URL,
-  timeout: 10000,
+  timeout: REQUEST_TIMEOUT_MS,
+  headers: { Accept: 'application/json' },
 });
 
 export const apiClient = axiosInstance;
 
 axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`, config.params || '');
+    if (__DEV__) console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`, config.params || '');
     return config;
   },
-  (error: AxiosError) => {
+  (error: AxiosError) => Promise.reject(error),
+);
+
+/** One quiet retry for transient network failures on idempotent GETs (flaky mobile connections). */
+axiosInstance.interceptors.response.use(
+  (res) => res,
+  async (error: AxiosError) => {
+    const cfg: any = error.config;
+    const transient = !error.response || error.response.status >= 502;
+    if (cfg && cfg.method === 'get' && transient && !cfg.__retried) {
+      cfg.__retried = true;
+      await new Promise((r) => setTimeout(r, 600));
+      return axiosInstance(cfg);
+    }
     return Promise.reject(error);
-  }
+  },
 );

@@ -1,220 +1,137 @@
-import React from 'react';
-import {
-  View,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-} from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, StyleSheet, FlatList, TouchableOpacity, Image, SafeAreaView, ActivityIndicator, RefreshControl, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../theme/ThemeContext';
+import { spacing, borderRadius } from '../theme';
 import { Text as ThemedText } from '../components/ui/Text';
 import { Card } from '../components/ui/Card';
-import { spacing, borderRadius } from '../theme';
+import { Article, ContentService, NEWS_CATEGORIES, categoryLabel } from '../services/content.service';
 
-interface NewsArticle {
-  id: string;
-  title: string;
-  summary: string;
-  image: string;
-  category: string;
-  time: string;
-  author: string;
-}
+const CATEGORIES = ['all', ...NEWS_CATEGORIES];
 
-const MOCK_NEWS: NewsArticle[] = [
-  {
-    id: '1',
-    title: 'India wins thrilling match against Australia',
-    summary: 'In a nail-biting finish, India secured victory by 5 runs in the final over...',
-    image: 'https://via.placeholder.com/400x250/1877f2/ffffff?text=News+1',
-    category: 'Match Report',
-    time: '2 hours ago',
-    author: 'John Smith',
-  },
-  {
-    id: '2',
-    title: 'Virat Kohli breaks another record',
-    summary: 'The Indian captain has now scored 50 ODI centuries, breaking multiple records...',
-    image: 'https://via.placeholder.com/400x250/42a5f5/ffffff?text=News+2',
-    category: 'Records',
-    time: '5 hours ago',
-    author: 'Sarah Johnson',
-  },
-  {
-    id: '3',
-    title: 'IPL 2024 auction dates announced',
-    summary: 'BCCI confirms the dates for the upcoming IPL mega auction scheduled for...',
-    image: 'https://via.placeholder.com/400x250/1877f2/ffffff?text=News+3',
-    category: 'IPL',
-    time: '8 hours ago',
-    author: 'Mike Wilson',
-  },
-  {
-    id: '4',
-    title: 'New cricket rules to be implemented',
-    summary: 'ICC announces major changes to playing conditions starting next season...',
-    image: 'https://via.placeholder.com/400x250/42a5f5/ffffff?text=News+4',
-    category: 'Updates',
-    time: '1 day ago',
-    author: 'Emma Davis',
-  },
-  {
-    id: '5',
-    title: 'Pakistan announces squad for series',
-    summary: 'PCB reveals the 15-member squad for the upcoming Test series against...',
-    image: 'https://via.placeholder.com/400x250/1877f2/ffffff?text=News+5',
-    category: 'Team News',
-    time: '1 day ago',
-    author: 'Ahmed Khan',
-  },
-];
+export const timeAgo = (iso?: string) => {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'Just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return d < 7 ? `${d}d ago` : new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+};
 
 export const AllNewsScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  const [category, setCategory] = useState('all');
+  const [items, setItems] = useState<Article[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
+  const reqId = useRef(0);
 
-  const renderNewsItem = ({ item }: { item: NewsArticle }) => (
-    <TouchableOpacity
-      onPress={() => navigation.navigate('NewsDetail', { newsId: item.id })}
-    >
-      <Card style={[styles.newsCard, { backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1 }]}>
-        <View style={styles.imageContainer}>
-          <View style={[styles.imagePlaceholder, { backgroundColor: isDark ? theme.border : theme.primary }]}>
-            <Ionicons name="newspaper-outline" size={40} color="white" />
+  const load = useCallback(async (p: number, mode: 'initial' | 'more' | 'refresh' = 'initial') => {
+    const id = ++reqId.current;
+    if (mode === 'initial') setLoading(true);
+    if (mode === 'more') setLoadingMore(true);
+    try {
+      const res = await ContentService.getNews({ page: p, limit: 10, category: category === 'all' ? undefined : category });
+      if (id !== reqId.current) return;
+      setItems((prev) => (p === 1 ? res.result : [...prev, ...res.result]));
+      setPage(p);
+      setHasMore(!!res.pagination && res.pagination.page < res.pagination.totalPages);
+      setError(false);
+    } catch {
+      if (id === reqId.current) setError(true);
+    } finally {
+      if (id === reqId.current) { setLoading(false); setLoadingMore(false); setRefreshing(false); }
+    }
+  }, [category]);
+
+  useEffect(() => { load(1); }, [load]);
+
+  const renderItem = ({ item }: { item: Article }) => (
+    <TouchableOpacity activeOpacity={0.85} onPress={() => navigation.navigate('NewsDetail', { newsId: item._id })} accessibilityRole="button" accessibilityLabel={item.title}>
+      <Card style={styles.card}>
+        {item.coverImage ? <Image source={{ uri: item.coverImage }} style={[styles.cover, { backgroundColor: theme.border }]} resizeMode="cover" /> : null}
+        <View style={styles.cardBody}>
+          <View style={[styles.badge, { backgroundColor: theme.primary + '20' }]}>
+            <ThemedText variant="caption" weight="semibold" style={{ color: theme.primary }}>{categoryLabel(item.category)}</ThemedText>
           </View>
-          <View style={[styles.categoryBadge, { backgroundColor: theme.primary }]}>
-            <ThemedText variant="small" color="white" weight="semibold">
-              {item.category}
-            </ThemedText>
-          </View>
-        </View>
-        <View style={styles.newsContent}>
-          <ThemedText variant="body" weight="bold" numberOfLines={2}>
-            {item.title}
-          </ThemedText>
-          <ThemedText variant="small" color="textSecondary" style={styles.summary} numberOfLines={2}>
-            {item.summary}
-          </ThemedText>
-          <View style={styles.newsFooter}>
-            <View style={styles.authorInfo}>
-              <Ionicons name="person-circle-outline" size={16} color={theme.textSecondary} />
-              <ThemedText variant="small" color="textSecondary" style={styles.author}>
-                {item.author}
-              </ThemedText>
-            </View>
-            <View style={styles.timeInfo}>
-              <Ionicons name="time-outline" size={14} color={theme.textSecondary} />
-              <ThemedText variant="small" color="textSecondary" style={styles.time}>
-                {item.time}
-              </ThemedText>
-            </View>
-          </View>
+          <ThemedText variant="subtitle" weight="bold" style={{ marginTop: spacing.xs }}>{item.title}</ThemedText>
+          {item.summary ? <ThemedText variant="small" color="textSecondary" numberOfLines={3} style={{ marginTop: spacing.xs }}>{item.summary}</ThemedText> : null}
+          <ThemedText variant="caption" color="textLight" style={{ marginTop: spacing.sm }}>{[item.authorName, timeAgo(item.publishedAt)].filter(Boolean).join(' • ')}</ThemedText>
         </View>
       </Card>
     </TouchableOpacity>
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <LinearGradient colors={isDark ? [theme.surface, theme.background] : [theme.primary, theme.primaryDark]} style={styles.header}>
-        <View style={styles.headerContent}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </TouchableOpacity>
-          <ThemedText variant="title" color="white" weight="bold">
-            All News
-          </ThemedText>
-          <View style={styles.placeholder} />
-        </View>
-      </LinearGradient>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back} accessibilityLabel="Go back">
+          <Ionicons name="arrow-back" size={24} color={theme.text} />
+        </TouchableOpacity>
+        <ThemedText variant="title" weight="bold">News</ThemedText>
+      </View>
+
+      <View style={{ backgroundColor: theme.surface }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+          {CATEGORIES.map((c) => {
+            const on = c === category;
+            return (
+              <TouchableOpacity key={c} onPress={() => setCategory(c)} style={[styles.chip, { backgroundColor: on ? theme.primary : theme.background, borderColor: on ? theme.primary : theme.border }]}>
+                <ThemedText variant="caption" weight={on ? 'bold' : 'medium'} color={on ? 'white' : 'textSecondary'}>{c === 'all' ? 'All' : categoryLabel(c)}</ThemedText>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
 
       <FlatList
-        data={MOCK_NEWS}
-        renderItem={renderNewsItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
+        data={items}
+        keyExtractor={(i) => i._id}
+        renderItem={renderItem}
+        contentContainerStyle={styles.list}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(1, 'refresh'); }} tintColor={theme.primary} />}
+        onEndReached={() => { if (hasMore && !loadingMore && !loading) load(page + 1, 'more'); }}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={loadingMore ? <ActivityIndicator style={{ margin: spacing.md }} color={theme.primary} /> : null}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            {loading ? <ActivityIndicator color={theme.primary} /> : (
+              <>
+                <Ionicons name={error ? 'cloud-offline-outline' : 'newspaper-outline'} size={48} color={theme.border} />
+                <ThemedText color="textSecondary" style={{ marginTop: spacing.md, textAlign: 'center' }}>
+                  {error ? 'Could not load news. Check your connection.' : 'No articles in this category yet.'}
+                </ThemedText>
+                {error && <TouchableOpacity onPress={() => load(1)} style={{ marginTop: spacing.md }}><ThemedText color="primary" weight="semibold">Retry</ThemedText></TouchableOpacity>}
+              </>
+            )}
+          </View>
+        }
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-  },
-  backButton: {
-    padding: spacing.xs,
-  },
-  placeholder: {
-    width: 40,
-  },
-  listContent: {
-    padding: spacing.lg,
-    gap: spacing.md,
-  },
-  newsCard: {
-    overflow: 'hidden',
-  },
-  imageContainer: {
-    position: 'relative',
-    height: 180,
-  },
-  imagePlaceholder: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  categoryBadge: {
-    position: 'absolute',
-    top: spacing.sm,
-    left: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
-  },
-  newsContent: {
-    padding: spacing.md,
-  },
-  summary: {
-    marginTop: spacing.xs,
-    lineHeight: 18,
-  },
-  newsFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing.sm,
-  },
-  authorInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  author: {
-    marginLeft: spacing.xs,
-  },
-  timeInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  time: {
-    marginLeft: spacing.xs,
-  },
+  container: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, gap: spacing.sm },
+  back: { padding: spacing.xs },
+  chips: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.sm },
+  chip: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs + 2, borderRadius: borderRadius.full, borderWidth: 1 },
+  list: { padding: spacing.md, paddingBottom: spacing.xl },
+  card: { padding: 0, overflow: 'hidden', marginBottom: spacing.md },
+  cover: { width: '100%', height: 160 },
+  cardBody: { padding: spacing.md },
+  badge: { alignSelf: 'flex-start', paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: borderRadius.sm },
+  empty: { alignItems: 'center', paddingTop: 80, paddingHorizontal: spacing.lg },
 });

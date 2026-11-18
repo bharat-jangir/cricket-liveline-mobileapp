@@ -1,29 +1,11 @@
 /**
- * socketClient.ts
- * Centralised Socket URL resolution for the mobile app.
- *
- * Priority order:
- *  1. EXPO_PUBLIC_SOCKET_URL  → use directly
- *  2. EXPO_PUBLIC_API_URL  → strip '/api' suffix (gateway handles WebSocket proxying on port 5000)
- *  3. Fallback → http://localhost:5000
+ * Centralised Socket URL for the mobile app (see src/config.ts).
+ * The gateway proxies /socket.io to the socket service, so this is normally the API origin.
  */
+import { SOCKET_URL } from '../config';
 
-const deriveSocketUrl = (): string => {
-  // 1. Explicit socket URL — highest priority
-  const explicit = process.env.EXPO_PUBLIC_SOCKET_URL;
-  if (explicit) return explicit;
+export { SOCKET_URL };
 
-  // 2. Derive from API URL
-  // If undefined, use the same default ngrok URL as apiClient.ts
-  const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'https://58db-43-249-53-255.ngrok-free.app/api';
-
-  // Strip /api suffix and return the root
-  return apiUrl.replace(/\/api\/?$/, '');
-};
-
-export const SOCKET_URL = deriveSocketUrl();
-
-// Log the resolved URL in dev mode
 if (__DEV__) {
   console.log('[socketClient] SOCKET_URL =', SOCKET_URL);
 }

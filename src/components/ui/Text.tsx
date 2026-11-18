@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text as RNText, TextStyle, TextProps as RNTextProps } from 'react-native';
 import { useTheme } from '@/theme/ThemeContext';
-import { fontSize } from '@/theme';
+import { fontSize, MAX_FONT_SCALE } from '@/theme';
 
 interface TextProps extends RNTextProps {
   children: React.ReactNode;
@@ -103,8 +103,8 @@ export const Text: React.FC<TextProps> = ({
   return (
     <RNText 
       style={[getTextStyle(), style]} 
-      allowFontScaling={false} 
-      maxFontSizeMultiplier={1}
+      // Respect the user's OS font size, but cap it so fixed-height UI (cards, chips, headers) never breaks
+      maxFontSizeMultiplier={MAX_FONT_SCALE}
       {...rest}
     >
       {children}
